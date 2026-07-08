@@ -50,9 +50,8 @@ class MainHook : IXposedHookLoadPackage {
         if (pkg != "com.ss.android.ugc.aweme" && pkg != "com.ss.android.ugc.aweme.lite") return
 
         classLoader = lpparam.classLoader
-        log("=== DouyinHelper v2.1 LOADED: $pkg process=${lpparam.processName} ===")
+        log("=== DouyinHelper v2.2 LOADED: $pkg process=${lpparam.processName} ===")
 
-        // Hook Application.attach to get Context early (same pattern as Bear d1.g)
         XposedHelpers.findAndHookMethod(
             Application::class.java, "attach", Context::class.java,
             object : XC_MethodHook() {
@@ -63,15 +62,10 @@ class MainHook : IXposedHookLoadPackage {
                     classLoader = appContext!!.classLoader
                     log("App attached, init hooks")
                     initHooks()
-                    // Diagnostic toast
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        Toast.makeText(appContext, "[?????] ???", Toast.LENGTH_LONG).show()
-                    }, 3000)
                 }
             })
     }
 
-    /* =========== hook helper (same pattern as d1.f.d in Bear) =========== */
     private fun hookByMethodName(
         tag: String, className: String, returnType: Class<*>?,
         methodName: String, vararg paramTypes: Class<*>,
@@ -101,10 +95,10 @@ class MainHook : IXposedHookLoadPackage {
         return false
     }
 
-    /* =========== init =========== */
     private fun initHooks() {
-        /* ---- 1. Share Menu - WrapSizeLinearLayout.onMeasure (same as u0/l.java a) ---- */
-        hookByMethodName(
+        val results = mutableListOf<String>()
+
+        if (hookByMethodName(
             "Menu",
             "com.ss.android.ugc.aweme.sharer.panelmodel.view.WrapSizeLinearLayout",
             Void.TYPE, "onMeasure",
@@ -116,15 +110,11 @@ class MainHook : IXposedHookLoadPackage {
                     if (panel.findViewWithTag<View>(888888) != null) return
                     val simpleName = panel.getChildAt(0).javaClass.simpleName
                     if (simpleName.contains("MeasureOnce") || simpleName.contains("Linear")) return
-
-                    val ctx = panel.context
-                    injectMenuItems(panel, ctx)
-                    log("Menu injected into WrapSizeLinearLayout")
+                    injectMenuItems(panel, panel.context)
                 }
-            })
+            })) results.add("分享菜单")
 
-        /* ---- 2. Share Menu - PanelBuilder$$buildPanel$$1.onCreateView (same as u0/l.java b) ---- */
-        hookByMethodName(
+        if (hookByMethodName(
             "Menu2",
             "com.ss.android.ugc.aweme.sharer.panelmodel.PanelBuilder${'$'}buildPanel${'$'}1",
             android.view.View::class.java, "onCreateView",
@@ -133,59 +123,69 @@ class MainHook : IXposedHookLoadPackage {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     val vg = param.result as? ViewGroup ?: return
                     if (!vg.javaClass.name.contains("common.keyboard.MeasureLinearLayout")) return
-                    val ctx = vg.context
-                    injectMenuItems(vg, ctx)
-                    log("Menu injected into PanelBuilder panel")
+                    injectMenuItems(vg, vg.context)
                 }
-            })
+            })) results.add("分享面板")
 
-        /* ---- 3. Splash ad (same as u0/s.java a) ---- */
-        hookByMethodName("Ad",
+        if (hookByMethodName("Ad",
             "com.bytedance.ies.ugc.aweme.commercialize.splash.show.SplashAdActivity",
             Void.TYPE, "onCreate", Bundle::class.java,
             object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     (param.thisObject as? android.app.Activity)?.finish()
-                    log("Blocked splash ad")
                 }
-            })
+            })) results.add("去广告")
 
-        /* ---- 4. Main splash skip (same as u0/s.java b) ---- */
-        hookByMethodName("Splash",
+        if (hookByMethodName("Splash",
             "com.ss.android.ugc.aweme.splash.SplashActivity",
             Void.TYPE, "onCreate", Bundle::class.java,
             object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
-                    try {
-                        XposedHelpers.callMethod(param.thisObject, "goMainActivity")
-                    } catch (_: Exception) {
-                        (param.thisObject as? android.app.Activity)?.finish()
-                    }
-                    log("Skipped splash")
+                    try { XposedHelpers.callMethod(param.thisObject, "goMainActivity") }
+                    catch (_: Exception) { (param.thisObject as? android.app.Activity)?.finish() }
                 }
-            })
+            })) results.add("跳过开屏")
 
-        /* ---- 5. Aweme data capture + anti-ad (same as c1/a.java d()) ---- */
-        hookByMethodName("Aweme",
+        if (hookByMethodName("Aweme",
             "com.ss.android.ugc.aweme.feed.model.Aweme",
             Boolean::class.javaPrimitiveType, "isAd",
             object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     currentAweme = param.thisObject
-                    param.result = false // always return not-ad
+                    param.result = false
                 }
-            })
+            })) results.add("数据捕获")
 
-        log("=== All hooks initialized ===")
+        val total = 5
+        val ok = results.size
+        if (ok == total) {
+            showAdaptToast("自动适配完成 全部${total}项已生效")
+        } else {
+            showAdaptToast("自动适配: ${ok}/${total}项 已适配: ${results.joinToString(" ")}")
+        }
+
+        log("=== Hooks: $ok/$total ${results.joinToString(", ")} ===")
     }
 
-    /* =========== Inject menu items into a ViewGroup =========== */
+    private fun showAdaptToast(msg: String) {
+        Handler(Looper.getMainLooper()).postDelayed({
+            val ctx = appContext ?: return@postDelayed
+            val toast = Toast.makeText(ctx, msg, Toast.LENGTH_LONG)
+            toast.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, 200)
+            toast.show()
+        }, 2000)
+        Handler(Looper.getMainLooper()).postDelayed({
+            val ctx = appContext ?: return@postDelayed
+            Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+        }, 8000)
+    }
+
     private fun injectMenuItems(container: ViewGroup, ctx: Context) {
         val isImage = isImageAweme()
         val items = listOf(
-            MenuItem("????") { copyLink(ctx) },
-            MenuItem(if (isImage) "????" else "????") { download(ctx, if (isImage) 2 else 1) },
-            MenuItem("????") { download(ctx, 0) }
+            MenuItem("复制链接") { copyLink(ctx) },
+            MenuItem(if (isImage) "图片下载" else "视频下载") { download(ctx, if (isImage) 2 else 1) },
+            MenuItem("音频下载") { download(ctx, 0) }
         )
 
         val rv = RecyclerView(ctx).apply {
@@ -203,7 +203,6 @@ class MainHook : IXposedHookLoadPackage {
         container.addView(pb)
     }
 
-    /* =========== Menu adapter =========== */
     data class MenuItem(val label: String, val action: () -> Unit)
 
     inner class MenuAdapter(private val items: List<MenuItem>) : RecyclerView.Adapter<MenuAdapter.VH>() {
@@ -222,7 +221,6 @@ class MainHook : IXposedHookLoadPackage {
         override fun getItemCount() = items.size
     }
 
-    /* =========== Utility =========== */
     private fun isImageAweme(): Boolean {
         return try {
             (XposedHelpers.getObjectField(currentAweme, "awemeType") as? Int) == 68
@@ -253,21 +251,21 @@ class MainHook : IXposedHookLoadPackage {
         if (text.isNotEmpty()) {
             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("desc", text))
-            toast("???!")
+            toast("已复制!")
         }
     }
 
     private fun download(ctx: Context, type: Int) {
         val url = when (type) {
             0 -> getMusicUrl()
-            2 -> null // image not yet
+            2 -> null
             else -> getVideoUrl()
         }
         if (url == null) {
-            toast("??????")
+            toast("获取链接失败")
             return
         }
-        toast("????...")
+        toast("开始下载...")
         Thread {
             try {
                 val conn = URL(url).openConnection() as HttpURLConnection
