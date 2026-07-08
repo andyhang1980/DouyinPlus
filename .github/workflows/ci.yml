@@ -35,7 +35,7 @@ jobs:
 
       - name: Generate keystore
         run: |
-          keytool -genkey -v -keystore debug.jks -alias debug \
+          keytool -genkey -v -keystore app/debug.jks -alias debug \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass android -keypass android -dname "CN=Debug"
 
@@ -44,7 +44,7 @@ jobs:
           export ANDROID_HOME=${ANDROID_HOME}
           export ANDROID_SDK_ROOT=${ANDROID_HOME}
           gradle assembleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file=debug.jks \
+            -Pandroid.injected.signing.store.file=app/debug.jks \
             -Pandroid.injected.signing.store.password=android \
             -Pandroid.injected.signing.key.alias=debug \
             -Pandroid.injected.signing.key.password=android
@@ -71,18 +71,16 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: "build-${{ steps.slug.outputs.sha }}"
-          name: "Build ${{ steps.slug.outputs.sha }} (鎶栭煶灏忚兘鎵?"
+          name: "Build ${{ steps.slug.outputs.sha }} (閹舵牠鐓剁亸蹇氬厴閹?"
           files: apk/*.apk
           prerelease: true
           body: |
-            ## 鎶栭煶灏忚兘鎵?- 鑷姩鏋勫缓 v1.1
+            ## 閹舵牠鐓剁亸蹇氬厴閹?- 閼奉亜濮╅弸鍕紦 v1.1
             
             - Commit: ${{ github.sha }}
-            - 鍔熻兘: 鍘诲箍鍛?路 鏃犳按鍗颁笅杞?路 闊抽涓嬭浇 路 澶嶅埗閾炬帴 路 鑷€傚簲閫傞厤
+            - 閸旂喕鍏? 閸樿绠嶉崨?璺?閺冪姵鎸夐崡棰佺瑓鏉?璺?闂婃娊顣舵稉瀣祰 璺?婢跺秴鍩楅柧鐐复 璺?閼奉亪鈧倸绨查柅鍌炲帳
             
-            ### 瀹夎
-            1. 纭繚宸插畨瑁?LSPosed 妗嗘灦
-            2. 瀹夎姝?APK
-            3. 鍦?LSPosed 涓惎鐢ㄦā鍧楀苟鍕鹃€夋姈闊?            4. 閲嶅惎鎶栭煶
+            ### 鐎瑰顥?            1. 绾喕绻氬鎻掔暔鐟?LSPosed 濡楀棙鐏?            2. 鐎瑰顥婂?APK
+            3. 閸?LSPosed 娑擃厼鎯庨悽銊δ侀崸妤€鑻熼崟楣冣偓澶嬪闂?            4. 闁插秴鎯庨幎鏍叾
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
