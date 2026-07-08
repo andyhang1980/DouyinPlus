@@ -17,9 +17,12 @@ class MainHook : IXposedHookLoadPackage {
             "com.ss.android.ugc.aweme",      // 抖音
             "com.ss.android.ugc.aweme.lite"  // 抖音极速版
         )
-        var moduleRes: Any? = null
+        var classLoader: ClassLoader? = null
+    var moduleRes: Any? = null
 
-        fun log(msg: String) {
+        fun getModuleClassLoader(): ClassLoader? = classLoader
+
+    fun log(msg: String) {
             Log.d(TAG, msg)
             XposedBridge.log("[$TAG] $msg")
         }
@@ -41,7 +44,8 @@ class MainHook : IXposedHookLoadPackage {
             XposedHelpers.findAndHookMethod(appClass, "onCreate",
                 object : de.robv.android.xposed.XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val ctx = param.thisObject as Context
+                        classLoader = lpparam.classLoader
+                    val ctx = param.thisObject as Context
                         log("抖音版本: " + ctx.packageManager
                             .getPackageInfo(ctx.packageName, 0).versionName)
                     }
@@ -59,3 +63,4 @@ class MainHook : IXposedHookLoadPackage {
         log("抖音小能手 hooks initialized!")
     }
 }
+
