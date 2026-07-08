@@ -36,19 +36,13 @@ jobs:
 
       - name: Generate keystore
         run: |
-          keytool -genkey -v -keystore ${{ github.workspace }}/app/debug.jks -alias debug \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android -dname "CN=Debug"
+          keytool -genkey -v -keystore ${{ github.workspace }}/app/debug.jks -alias debug             -keyalg RSA -keysize 2048 -validity 10000             -storepass android -keypass android -dname "CN=Debug"
 
       - name: Build
         run: |
           export ANDROID_HOME=${ANDROID_HOME}
           export ANDROID_SDK_ROOT=${ANDROID_HOME}
-          gradle assembleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/debug.jks \
-            -Pandroid.injected.signing.store.password=android \
-            -Pandroid.injected.signing.key.alias=debug \
-            -Pandroid.injected.signing.key.password=android
+          gradle assembleRelease --no-daemon             -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/debug.jks             -Pandroid.injected.signing.store.password=android             -Pandroid.injected.signing.key.alias=debug             -Pandroid.injected.signing.key.password=android
 
       - uses: actions/upload-artifact@v4
         with:
@@ -72,18 +66,22 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: "build-${{ steps.slug.outputs.sha }}"
-          name: "Build ${{ steps.slug.outputs.sha }} (鎶栭煶灏忚兘鎵?"
+          name: "Build ${{ steps.slug.outputs.sha }} (DouyinHelper)"
           files: apk/*.apk
           prerelease: true
           body: |
-            ## 鎶栭煶灏忚兘鎵?- 鑷姩鏋勫缓 v1.1
-            
-            - Commit: ${{ github.sha }}
-            - 鍔熻兘: 鍘诲箍鍛?路 鏃犳按鍗颁笅杞?路 闊抽涓嬭浇 路 澶嶅埗閾炬帴 路 鑷€傚簲閫傞厤
-            
-            ### 瀹夎
-            1. 纭繚宸插畨瑁?LSPosed 妗嗘灦
-            2. 瀹夎姝?APK
-            3. 鍦?LSPosed 涓惎鐢ㄦā鍧楀苟鍕鹃€夋姈闊?            4. 閲嶅惎鎶栭煶
+            ## DouyinHelper v1.1
+
+            * No ads
+            * Download videos without watermark
+            * Download audio
+            * Copy link
+            * Adaptive hooks (auto-discover target classes)
+
+            ### Install
+            1. Install LSPosed framework
+            2. Install this APK
+            3. Enable module in LSPosed and select Douyin
+            4. Restart Douyin
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
