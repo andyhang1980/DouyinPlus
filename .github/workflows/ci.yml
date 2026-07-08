@@ -27,6 +27,7 @@ jobs:
           echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=${ANDROID_HOME}" >> $GITHUB_ENV
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" 2>/dev/null || true
+
       - name: Download Gradle
         run: |
           wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
@@ -44,7 +45,7 @@ jobs:
           export ANDROID_HOME=${ANDROID_HOME}
           export ANDROID_SDK_ROOT=${ANDROID_HOME}
           gradle assembleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file=app/debug.jks \
+            -Pandroid.injected.signing.store.file=debug.jks \
             -Pandroid.injected.signing.store.password=android \
             -Pandroid.injected.signing.key.alias=debug \
             -Pandroid.injected.signing.key.password=android
@@ -71,16 +72,19 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: "build-${{ steps.slug.outputs.sha }}"
-          name: "Build ${{ steps.slug.outputs.sha }} (閹舵牠鐓剁亸蹇氬厴閹?"
+          name: "Build ${{ steps.slug.outputs.sha }} (抖音小能手)"
           files: apk/*.apk
           prerelease: true
           body: |
-            ## 閹舵牠鐓剁亸蹇氬厴閹?- 閼奉亜濮╅弸鍕紦 v1.1
+            ## 抖音小能手 - 自动构建 v1.1
             
             - Commit: ${{ github.sha }}
-            - 閸旂喕鍏? 閸樿绠嶉崨?璺?閺冪姵鎸夐崡棰佺瑓鏉?璺?闂婃娊顣舵稉瀣祰 璺?婢跺秴鍩楅柧鐐复 璺?閼奉亪鈧倸绨查柅鍌炲帳
+            - 功能: 去广告 · 无水印下载 · 音频下载 · 复制链接 · 自适应适配
             
-            ### 鐎瑰顥?            1. 绾喕绻氬鎻掔暔鐟?LSPosed 濡楀棙鐏?            2. 鐎瑰顥婂?APK
-            3. 閸?LSPosed 娑擃厼鎯庨悽銊δ侀崸妤€鑻熼崟楣冣偓澶嬪闂?            4. 闁插秴鎯庨幎鏍叾
+            ### 安装
+            1. 确保已安装 LSPosed 框架
+            2. 安装此 APK
+            3. 在 LSPosed 中启用模块并勾选抖音
+            4. 重启抖音
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
