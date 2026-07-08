@@ -36,6 +36,8 @@ jobs:
           gradle-version: "8.5"
           arguments: |
             assembleRelease
+            --stacktrace
+            --info
             -Pandroid.injected.signing.store.file=debug.jks
             -Pandroid.injected.signing.store.password=android
             -Pandroid.injected.signing.key.alias=debug
@@ -57,7 +59,6 @@ jobs:
         with:
           name: DouyinPlus-APK
           path: apk
-
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
