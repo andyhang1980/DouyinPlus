@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Main "D" letter body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M37,24v60h18.5c9.5,0 17.5,-3 23.5,-8.5c6,-5.5 9,-13 9,-21.5s-3,-16 -9,-21.5c-6,-5.5 -14,-8.5 -23.5,-8.5H37zM45,32h10c5.5,0 10,2 13.5,5.5c3.5,3.5 5.5,8.5 5.5,14.5s-2,11 -5.5,14.5c-3.5,3.5 -8,5.5 -13.5,5.5H45V32z" />
+
+    <!-- Sparkle star in the D counter (inner space) -->
+    <path
+        android:fillColor="#FFD60A"
+        android:pathData="M58,46l1.5,4.5l4.5,0.5l-3.5,3l1,4.5l-3.5,-2.5l-3.5,2.5l1,-4.5l-3.5,-3l4.5,-0.5z" />
+
+    <!-- Small dot accent -->
+    <path
+        android:fillColor="#FFD60A"
+        android:pathData="M74,26m-2.5,0a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0" />
+</vector>

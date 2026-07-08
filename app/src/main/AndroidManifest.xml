@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
+    <application android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"
         android:allowBackup="false"
-        android:label="抖音小能手"
+        android:label="鎶栭煶灏忚兘鎵?
         android:supportsRtl="true">
 
         <meta-data android:name="xposedmodule" android:value="true" />
-        <meta-data android:name="xposeddescription" android:value="抖音小能手: 去广告·无水印下载·复制链接·音频下载" />
+        <meta-data android:name="xposeddescription" android:value="鎶栭煶灏忚兘鎵? 鍘诲箍鍛娐锋棤姘村嵃涓嬭浇路澶嶅埗閾炬帴路闊抽涓嬭浇" />
         <meta-data android:name="xposedminversion" android:value="82" />
         <meta-data android:name="xposedscope" android:resource="@array/douyin_scope" />
     </application>
