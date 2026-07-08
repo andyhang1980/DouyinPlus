@@ -24,13 +24,18 @@ jobs:
 
       - name: Setup Android SDK
         run: |
-          # Use the pre-installed ANDROID_HOME on GitHub Actions runner
           echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=${ANDROID_HOME}" >> $GITHUB_ENV
-          # Install required SDK components if missing
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --list 2>/dev/null | head -1
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" 2>/dev/null || true
-          echo "SDK setup done"
+
+      - name: Download Xposed API
+        run: |
+          mkdir -p app/libs
+          wget -q -O app/libs/api-82.jar \
+            "https://github.com/rovo89/XposedBridge/raw/art/app/api-82.jar" || \
+          wget -q -O app/libs/api-82.jar \
+            "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar" || \
+          echo "WARNING: Could not download Xposed API jar"
 
       - name: Download Gradle
         run: |
@@ -45,10 +50,9 @@ jobs:
             -storepass android -keypass android -dname "CN=Debug"
 
       - name: Build
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
         run: |
+          export ANDROID_HOME=${ANDROID_HOME}
+          export ANDROID_SDK_ROOT=${ANDROID_HOME}
           gradle assembleRelease --no-daemon \
             -Pandroid.injected.signing.store.file=debug.jks \
             -Pandroid.injected.signing.store.password=android \
