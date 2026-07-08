@@ -1,8 +1,8 @@
 package com.dyhelper
 
 import android.content.Context
-import android.os.Build
 import android.util.Log
+import android.widget.Toast
 import com.dyhelper.adaptive.HookCache
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XposedBridge
@@ -19,9 +19,6 @@ class MainHook : IXposedHookLoadPackage {
             "com.ss.android.ugc.aweme",
             "com.ss.android.ugc.aweme.lite"
         )
-        private val DOUYIN_VARIANTS = arrayOf(
-            "com.ss.android.ugc.aweme.live",
-        )
 
         var classLoader: ClassLoader? = null
         var currentVersion: String = "unknown"
@@ -36,63 +33,52 @@ class MainHook : IXposedHookLoadPackage {
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val allPkgs = DOUYIN_PKGS + DOUYIN_VARIANTS
-        if (lpparam.packageName !in allPkgs) return
+        if (lpparam.packageName !in DOUYIN_PKGS) return
 
         currentPackage = lpparam.packageName
-
-        log("========================================")
-        log("抖音小能手 v1.1 (adaptive) loaded -> ${lpparam.packageName}")
-        log("Process: ${lpparam.processName}")
-        log("Android SDK: ${Build.VERSION.SDK_INT}")
-        log("========================================")
-
-        if (lpparam.processName != lpparam.packageName &&
-            lpparam.processName != "${lpparam.packageName}:main") {
-            log("Skipping sub-process: ${lpparam.processName}")
-            return
-        }
-
         classLoader = lpparam.classLoader
 
+        log("========================================")
+        log("DouyinHelper v1.2 loaded -> ${lpparam.packageName}")
+        log("Process: ${lpparam.processName}")
+        log("========================================")
+
+        // DO NOT filter by process name - Douyin versions vary
+        // Run hooks immediately, don't wait for Application
+        try {
+            initAllHooks(lpparam)
+        } catch (e: Exception) {
+            log("ERROR in initAllHooks: ${e.message}")
+            Log.e(TAG, "initAllHooks error", e)
+        }
+
+        // Also try to hook Application for cache init and version detection
         try {
             val appClass = XposedHelpers.findClass(
                 "com.ss.android.ugc.aweme.app.host.HostApplication",
                 lpparam.classLoader
             )
             XposedHelpers.findAndHookMethod(appClass, "onCreate",
-                object : de.robv.android.xposed.XC_MethodHook() {
+                object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
-                        val ctx = param.thisObject as Context
-                        currentVersion = try {
-                            ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "unknown"
-                        } catch (_: Exception) { "unknown" }
-                        log("抖音版本: $currentVersion")
-
-                        // Initialize adaptive cache with app context
-                        HookCache.init(ctx)
-
-                        // Now run hooks
-                        initAllHooks(lpparam)
+                        try {
+                            val ctx = param.thisObject as Context
+                            currentVersion = ctx.packageManager
+                                .getPackageInfo(ctx.packageName, 0).versionName ?: "unknown"
+                            log("Douyin version: $currentVersion")
+                            HookCache.init(ctx)
+                        } catch (_: Exception) {}
                     }
                 })
         } catch (_: Exception) {
-            log("WARNING: Could not hook HostApplication.onCreate, using fallback")
-            initAllHooks(lpparam)
+            log("Note: HostApplication not hooked (non-critical)")
         }
     }
 
     private fun initAllHooks(lpparam: XC_LoadPackage.LoadPackageParam) {
-        log("Starting hook initialization...")
-
-        try {
-            AntiAdsHook.init(lpparam)
-            ShareMenuHook.init(lpparam)
-        } catch (e: Exception) {
-            log("ERROR during hook init: ${e.message}")
-            Log.e(TAG, "Hook init error", e)
-        }
-
-        log("抖音小能手 hooks initialized!")
+        log("Initializing hooks...")
+        AntiAdsHook.init(lpparam)
+        ShareMenuHook.init(lpparam)
+        log("All hooks initialized!")
     }
 }
