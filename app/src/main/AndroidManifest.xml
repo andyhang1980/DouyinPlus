@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- LSPosed module indicator -->
+    <application
+        android:allowBackup="false"
+        android:label="DouyinPlus"
+        android:supportsRtl="true">
+
+        <!-- Xposed module metadata -->
+        <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+        <meta-data
+            android:name="xposeddescription"
+            android:value="Douyin: 去广告 · 去更新 · 无水印下载" />
+        <meta-data
+            android:name="xposedminversion"
+            android:value="82" />
+
+        <!-- LSPosed scope: only hook Douyin -->
+        <meta-data
+            android:name="xposedscope"
+            android:resource="@array/douyin_scope" />
+
+        <!-- Settings activity (optional) -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="DouyinPlus" />
+    </application>
+
+</manifest>
