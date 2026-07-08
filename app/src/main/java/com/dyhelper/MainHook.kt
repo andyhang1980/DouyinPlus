@@ -1,5 +1,6 @@
 package com.dyhelper
 
+import android.app.Application
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
@@ -22,7 +23,6 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.io.File
 import java.io.FileOutputStream
-import java.lang.reflect.Method
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -31,15 +31,16 @@ class MainHook : IXposedHookLoadPackage {
     companion object {
         var classLoader: ClassLoader? = null
         var currentAweme: Any? = null
-        private const val TAG = "DH"
+        var appContext: Context? = null
+        private var inited = false
 
         fun log(msg: String) {
             XposedBridge.log("[DH] $msg")
         }
 
-        fun toast(ctx: Context, msg: String) {
+        fun toast(msg: String) {
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+                appContext?.let { Toast.makeText(it, msg, Toast.LENGTH_SHORT).show() }
             }
         }
     }
@@ -49,8 +50,25 @@ class MainHook : IXposedHookLoadPackage {
         if (pkg != "com.ss.android.ugc.aweme" && pkg != "com.ss.android.ugc.aweme.lite") return
 
         classLoader = lpparam.classLoader
-        log("LOADED: $pkg process=${lpparam.processName}")
-        initHooks(lpparam)
+        log("=== DouyinHelper v2.1 LOADED: $pkg process=${lpparam.processName} ===")
+
+        // Hook Application.attach to get Context early (same pattern as Bear d1.g)
+        XposedHelpers.findAndHookMethod(
+            Application::class.java, "attach", Context::class.java,
+            object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    if (inited) return
+                    inited = true
+                    appContext = param.args[0] as Context
+                    classLoader = appContext!!.classLoader
+                    log("App attached, init hooks")
+                    initHooks()
+                    // Diagnostic toast
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        Toast.makeText(appContext, "[?????] ???", Toast.LENGTH_LONG).show()
+                    }, 3000)
+                }
+            })
     }
 
     /* =========== hook helper (same pattern as d1.f.d in Bear) =========== */
@@ -66,9 +84,7 @@ class MainHook : IXposedHookLoadPackage {
         }
         for (m in clazz.declaredMethods) {
             if (m.name != methodName) continue
-            // Check return type
             if (returnType != null && m.returnType != returnType) continue
-            // Check params
             val params = m.parameterTypes
             if (params.size != paramTypes.size) continue
             var match = true
@@ -86,11 +102,10 @@ class MainHook : IXposedHookLoadPackage {
     }
 
     /* =========== init =========== */
-    private fun initHooks(lpparam: XC_LoadPackage.LoadPackageParam) {
-        /* ---- 1. Share Menu (same as u0/l.java in Bear) ---- */
-        // Hook 1a: WrapSizeLinearLayout.onMeasure
+    private fun initHooks() {
+        /* ---- 1. Share Menu - WrapSizeLinearLayout.onMeasure (same as u0/l.java a) ---- */
         hookByMethodName(
-            "Menu", 
+            "Menu",
             "com.ss.android.ugc.aweme.sharer.panelmodel.view.WrapSizeLinearLayout",
             Void.TYPE, "onMeasure",
             Integer.TYPE, Integer.TYPE,
@@ -103,33 +118,15 @@ class MainHook : IXposedHookLoadPackage {
                     if (simpleName.contains("MeasureOnce") || simpleName.contains("Linear")) return
 
                     val ctx = panel.context
-                    val isImage = isImageAweme()
-                    val items = listOf(
-                        "????" to Runnable { copyLink(ctx) },
-                        (if (isImage) "????" else "????") to Runnable { download(ctx, if (isImage) 2 else 1) },
-                        "????" to Runnable { download(ctx, 0) }
-                    )
-
-                    val rv = RecyclerView(ctx).apply {
-                        layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
-                        setPadding(13, 0, 13, 0)
-                        adapter = MenuAdapter(items)
-                        tag = 888888
-                    }
-                    panel.addView(rv)
-
-                    val pb = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
-                        max = 100; visibility = View.GONE
-                    }
-                    panel.addView(pb)
-                    log("Menu injected!")
+                    injectMenuItems(panel, ctx)
+                    log("Menu injected into WrapSizeLinearLayout")
                 }
             })
 
-        // Hook 1b: PanelBuilder buildPanel (second share panel variant)
+        /* ---- 2. Share Menu - PanelBuilder$$buildPanel$$1.onCreateView (same as u0/l.java b) ---- */
         hookByMethodName(
             "Menu2",
-            "com.ss.android.ugc.aweme.sharer.panelmodel.PanelBuilder\$buildPanel\$1",
+            "com.ss.android.ugc.aweme.sharer.panelmodel.PanelBuilder${'$'}buildPanel${'$'}1",
             android.view.View::class.java, "onCreateView",
             Context::class.java, ViewGroup::class.java,
             object : XC_MethodHook() {
@@ -137,26 +134,12 @@ class MainHook : IXposedHookLoadPackage {
                     val vg = param.result as? ViewGroup ?: return
                     if (!vg.javaClass.name.contains("common.keyboard.MeasureLinearLayout")) return
                     val ctx = vg.context
-                    val isImage = isImageAweme()
-                    val items = listOf(
-                        "????" to Runnable { copyLink(ctx) },
-                        (if (isImage) "????" else "????") to Runnable { download(ctx, if (isImage) 2 else 1) },
-                        "????" to Runnable { download(ctx, 0) }
-                    )
-                    val rv = RecyclerView(ctx).apply {
-                        layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
-                        setPadding(13, 0, 13, 0)
-                        adapter = MenuAdapter(items)
-                    }
-                    vg.addView(rv)
-                    val pb = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
-                        max = 100; visibility = View.GONE
-                    }
-                    vg.addView(pb)
+                    injectMenuItems(vg, ctx)
+                    log("Menu injected into PanelBuilder panel")
                 }
             })
 
-        /* ---- 2. Splash ad + main splash (same as u0/s.java) ---- */
+        /* ---- 3. Splash ad (same as u0/s.java a) ---- */
         hookByMethodName("Ad",
             "com.bytedance.ies.ugc.aweme.commercialize.splash.show.SplashAdActivity",
             Void.TYPE, "onCreate", Bundle::class.java,
@@ -167,44 +150,74 @@ class MainHook : IXposedHookLoadPackage {
                 }
             })
 
+        /* ---- 4. Main splash skip (same as u0/s.java b) ---- */
         hookByMethodName("Splash",
             "com.ss.android.ugc.aweme.splash.SplashActivity",
             Void.TYPE, "onCreate", Bundle::class.java,
             object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
-                    try { XposedHelpers.callMethod(param.thisObject, "goMainActivity") }
-                    catch (_: Exception) { (param.thisObject as? android.app.Activity)?.finish() }
+                    try {
+                        XposedHelpers.callMethod(param.thisObject, "goMainActivity")
+                    } catch (_: Exception) {
+                        (param.thisObject as? android.app.Activity)?.finish()
+                    }
                     log("Skipped splash")
                 }
             })
 
-        /* ---- 3. Aweme data capture (same as c1/c.java in Bear) ---- */
+        /* ---- 5. Aweme data capture + anti-ad (same as c1/a.java d()) ---- */
         hookByMethodName("Aweme",
             "com.ss.android.ugc.aweme.feed.model.Aweme",
             Boolean::class.javaPrimitiveType, "isAd",
             object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     currentAweme = param.thisObject
-                    param.result = false
+                    param.result = false // always return not-ad
                 }
             })
 
-        log("All hooks initialized")
+        log("=== All hooks initialized ===")
+    }
+
+    /* =========== Inject menu items into a ViewGroup =========== */
+    private fun injectMenuItems(container: ViewGroup, ctx: Context) {
+        val isImage = isImageAweme()
+        val items = listOf(
+            MenuItem("????") { copyLink(ctx) },
+            MenuItem(if (isImage) "????" else "????") { download(ctx, if (isImage) 2 else 1) },
+            MenuItem("????") { download(ctx, 0) }
+        )
+
+        val rv = RecyclerView(ctx).apply {
+            layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
+            setPadding(13, 0, 13, 0)
+            adapter = MenuAdapter(items)
+            tag = 888888
+        }
+        container.addView(rv)
+
+        val pb = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            visibility = View.GONE
+        }
+        container.addView(pb)
     }
 
     /* =========== Menu adapter =========== */
-    data class MenuItem(val label: String, val action: Runnable)
+    data class MenuItem(val label: String, val action: () -> Unit)
 
-    class MenuAdapter(private val items: List<MenuItem>) : RecyclerView.Adapter<MenuAdapter.VH>() {
-        class VH(view: TextView) : RecyclerView.ViewHolder(view)
+    inner class MenuAdapter(private val items: List<MenuItem>) : RecyclerView.Adapter<MenuAdapter.VH>() {
+        inner class VH(view: TextView) : RecyclerView.ViewHolder(view)
         override fun onCreateViewHolder(parent: ViewGroup, vt: Int): VH = VH(
             TextView(parent.context).apply {
-                textSize = 12f; setTextColor(Color.parseColor("#CCCCCC"))
-                gravity = Gravity.CENTER; setPadding(20, 12, 20, 12)
+                textSize = 12f
+                setTextColor(Color.parseColor("#CCCCCC"))
+                gravity = Gravity.CENTER
+                setPadding(20, 12, 20, 12)
             })
         override fun onBindViewHolder(vh: VH, pos: Int) {
             (vh.itemView as TextView).text = items[pos].label
-            vh.itemView.setOnClickListener { items[pos].action.run() }
+            vh.itemView.setOnClickListener { items[pos].action() }
         }
         override fun getItemCount() = items.size
     }
@@ -217,8 +230,9 @@ class MainHook : IXposedHookLoadPackage {
     }
 
     private fun getVideoUrl(): String? {
-        return try { XposedHelpers.callMethod(currentAweme, "getFirstPlayAddr") as? String }
-        catch (_: Exception) { null }
+        return try {
+            XposedHelpers.callMethod(currentAweme, "getFirstPlayAddr") as? String
+        } catch (_: Exception) { null }
     }
 
     private fun getMusicUrl(): String? {
@@ -231,38 +245,55 @@ class MainHook : IXposedHookLoadPackage {
     }
 
     private fun copyLink(ctx: Context) {
-        val desc = try { XposedHelpers.getObjectField(currentAweme, "desc") as? String ?: "" } catch (_: Exception) { "" }
+        val desc = try {
+            XposedHelpers.getObjectField(currentAweme, "desc") as? String ?: ""
+        } catch (_: Exception) { "" }
         val url = getVideoUrl() ?: ""
         val text = if (desc.isNotEmpty()) "$desc\n$url" else url
         if (text.isNotEmpty()) {
             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
             cm.setPrimaryClip(android.content.ClipData.newPlainText("desc", text))
-            toast(ctx, "???!")
+            toast("???!")
         }
     }
 
     private fun download(ctx: Context, type: Int) {
         val url = when (type) {
             0 -> getMusicUrl()
-            2 -> null // image download not implemented
+            2 -> null // image not yet
             else -> getVideoUrl()
         }
-        if (url == null) { toast(ctx, "?????"); return }
-        toast(ctx, "????...")
+        if (url == null) {
+            toast("??????")
+            return
+        }
+        toast("????...")
         Thread {
             try {
                 val conn = URL(url).openConnection() as HttpURLConnection
-                conn.connectTimeout = 15000; conn.readTimeout = 60000; conn.connect()
-                if (conn.responseCode != 200) { log("HTTP ${conn.responseCode}"); return@Thread }
+                conn.connectTimeout = 15000
+                conn.readTimeout = 60000
+                conn.connect()
+                if (conn.responseCode != 200) {
+                    log("Download HTTP ${conn.responseCode}")
+                    return@Thread
+                }
                 val ext = if (type == 0) ".mp3" else ".mp4"
                 val name = "dy_${System.currentTimeMillis()}$ext"
-                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DouyinHelper")
+                val dir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "DouyinHelper"
+                )
                 if (!dir.exists()) dir.mkdirs()
                 val file = File(dir, name)
-                conn.inputStream.use { i -> FileOutputStream(file).use { o -> i.copyTo(o) } }
+                conn.inputStream.use { input ->
+                    FileOutputStream(file).use { output -> input.copyTo(output) }
+                }
                 log("Downloaded: $file")
                 conn.disconnect()
-            } catch (e: Exception) { log("Download err: ${e.message}") }
+            } catch (e: Exception) {
+                log("Download err: ${e.message}")
+            }
         }.start()
     }
 }
