@@ -1,20 +1,20 @@
 package com.dyhelper
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -22,23 +22,19 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.io.File
 import java.io.FileOutputStream
+import java.lang.reflect.Method
 import java.net.HttpURLConnection
 import java.net.URL
 
 class MainHook : IXposedHookLoadPackage {
 
     companion object {
-        const val TAG = "DouyinHelper"
-        val PKGS = arrayOf(
-            "com.ss.android.ugc.aweme",
-            "com.ss.android.ugc.aweme.lite"
-        )
         var classLoader: ClassLoader? = null
         var currentAweme: Any? = null
+        private const val TAG = "DH"
 
         fun log(msg: String) {
-            Log.d(TAG, msg)
-            XposedBridge.log("[$TAG] $msg")
+            XposedBridge.log("[DH] $msg")
         }
 
         fun toast(ctx: Context, msg: String) {
@@ -49,253 +45,224 @@ class MainHook : IXposedHookLoadPackage {
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
-        if (lpparam.packageName !in PKGS) return
+        val pkg = lpparam.packageName
+        if (pkg != "com.ss.android.ugc.aweme" && pkg != "com.ss.android.ugc.aweme.lite") return
+
         classLoader = lpparam.classLoader
-        log("LOADED: " + lpparam.packageName)
+        log("LOADED: $pkg process=${lpparam.processName}")
+        initHooks(lpparam)
+    }
 
-        /* ============ 1. Share Menu Hook ============ */
-        try {
-            XposedHelpers.findAndHookMethod(
-                "com.ss.android.ugc.aweme.sharer.panelmodel.view.WrapSizeLinearLayout",
-                lpparam.classLoader, "onMeasure",
-                Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        val panel = param.thisObject as? ViewGroup ?: return
-                        if (panel.findViewWithTag<View>(999888) != null) return
-                        if (panel.childCount < 1) return
-
-                        // Check for MeasureLinearLayout to avoid early injection
-                        val first = panel.getChildAt(0)
-                        if (first.javaClass.name.contains("MeasureLinearLayout")) return
-
-                        val ctx = panel.context
-                        val items = listOf(
-                            "????" to { copyLink(ctx) },
-                            "????" to { download(ctx, 1) },
-                            "????" to { download(ctx, 0) }
-                        )
-
-                        val container = LinearLayout(ctx).apply {
-                            orientation = LinearLayout.HORIZONTAL
-                            setPadding(12, 4, 12, 8)
-                            tag = 999888
-                        }
-
-                        for ((label, action) in items) {
-                            val btn = TextView(ctx).apply {
-                                text = label
-                                setTextColor(Color.parseColor("#CCCCCC"))
-                                textSize = 12f
-                                gravity = Gravity.CENTER
-                                setPadding(16, 8, 16, 8)
-                                setOnClickListener { action() }
-                            }
-                            container.addView(btn)
-                        }
-                        panel.addView(container)
-                        log("Share menu injected")
-                    }
-                })
-            log("ShareMenu hook OK")
-        } catch (e: Exception) {
-            log("ShareMenu hook FAILED: " + e.message)
+    /* =========== hook helper (same pattern as d1.f.d in Bear) =========== */
+    private fun hookByMethodName(
+        tag: String, className: String, returnType: Class<*>?,
+        methodName: String, vararg paramTypes: Class<*>,
+        callback: XC_MethodHook
+    ): Boolean {
+        val clazz = XposedHelpers.findClassIfExists(className, classLoader)
+        if (clazz == null) {
+            log("[$tag] Class NOT found: $className")
+            return false
         }
-
-        /* ============ 2. Splash Ad Hook ============ */
-        try {
-            XposedHelpers.findAndHookMethod(
-                "com.bytedance.ies.ugc.aweme.commercialize.splash.show.SplashAdActivity",
-                lpparam.classLoader, "onCreate", Bundle::class.java,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        (param.thisObject as? android.app.Activity)?.finish()
-                        log("Blocked splash ad")
-                    }
-                })
-            log("SplashAd hook OK")
-        } catch (e: Exception) {
-            log("SplashAd hook FAILED: " + e.message)
+        for (m in clazz.declaredMethods) {
+            if (m.name != methodName) continue
+            // Check return type
+            if (returnType != null && m.returnType != returnType) continue
+            // Check params
+            val params = m.parameterTypes
+            if (params.size != paramTypes.size) continue
+            var match = true
+            for (i in paramTypes.indices) {
+                if (paramTypes[i] != null && paramTypes[i] != params[i]) { match = false; break }
+            }
+            if (!match) continue
+            m.isAccessible = true
+            XposedBridge.hookMethod(m, callback)
+            log("[$tag] Hooked: ${clazz.simpleName}.${m.name}")
+            return true
         }
+        log("[$tag] Method NOT found: $methodName in $className")
+        return false
+    }
 
-        /* ============ 3. Main Splash skip ============ */
-        try {
-            XposedHelpers.findAndHookMethod(
-                "com.ss.android.ugc.aweme.splash.SplashActivity",
-                lpparam.classLoader, "onCreate", Bundle::class.java,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        try {
-                            XposedHelpers.callMethod(param.thisObject, "goMainActivity")
-                        } catch (_: Exception) {
-                            (param.thisObject as? android.app.Activity)?.finish()
-                        }
-                        log("Skipped main splash")
+    /* =========== init =========== */
+    private fun initHooks(lpparam: XC_LoadPackage.LoadPackageParam) {
+        /* ---- 1. Share Menu (same as u0/l.java in Bear) ---- */
+        // Hook 1a: WrapSizeLinearLayout.onMeasure
+        hookByMethodName(
+            "Menu", 
+            "com.ss.android.ugc.aweme.sharer.panelmodel.view.WrapSizeLinearLayout",
+            Void.TYPE, "onMeasure",
+            Integer.TYPE, Integer.TYPE,
+            object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val panel = param.thisObject as? LinearLayout ?: return
+                    if (panel.childCount < 1) return
+                    if (panel.findViewWithTag<View>(888888) != null) return
+                    val simpleName = panel.getChildAt(0).javaClass.simpleName
+                    if (simpleName.contains("MeasureOnce") || simpleName.contains("Linear")) return
+
+                    val ctx = panel.context
+                    val isImage = isImageAweme()
+                    val items = listOf(
+                        "????" to Runnable { copyLink(ctx) },
+                        (if (isImage) "????" else "????") to Runnable { download(ctx, if (isImage) 2 else 1) },
+                        "????" to Runnable { download(ctx, 0) }
+                    )
+
+                    val rv = RecyclerView(ctx).apply {
+                        layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
+                        setPadding(13, 0, 13, 0)
+                        adapter = MenuAdapter(items)
+                        tag = 888888
                     }
-                })
-            log("Splash hook OK")
-        } catch (e: Exception) {
-            log("Splash hook FAILED: " + e.message)
-        }
+                    panel.addView(rv)
 
-        /* ============ 4. Aweme model - capture data + block ads ============ */
-        try {
-            val awemeCls = lpparam.classLoader.loadClass(
-                "com.ss.android.ugc.aweme.feed.model.Aweme")
-            // Hook isAd()
-            for (m in awemeCls.declaredMethods) {
-                if (m.name == "isAd" && m.parameterTypes.isEmpty() &&
-                    m.returnType == Boolean::class.javaPrimitiveType) {
-                    XposedBridge.hookMethod(m, object : XC_MethodHook() {
-                        override fun afterHookedMethod(param: MethodHookParam) {
-                            currentAweme = param.thisObject
-                            param.result = false
-                        }
-                    })
-                    log("Hooked Aweme.isAd()")
-                    break
+                    val pb = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
+                        max = 100; visibility = View.GONE
+                    }
+                    panel.addView(pb)
+                    log("Menu injected!")
                 }
-            }
-        } catch (e: Exception) {
-            log("Aweme hook FAILED: " + e.message)
-        }
+            })
 
-        /* ============ 5. IFeedViewHolder hook for video data ============ */
-        try {
-            val ifeedCls = XposedHelpers.findClassIfExists(
-                "com.ss.android.ugc.aweme.feed.adapter.IFeedViewHolder",
-                lpparam.classLoader)
-            if (ifeedCls != null) {
-                // Hook onPageSelected-like methods via VideoViewHolder
-                XposedHelpers.findAndHookMethod(
-                    "com.ss.android.ugc.aweme.feed.adapter.VideoViewHolder",
-                    lpparam.classLoader, "onPageSelected",
-                    object : XC_MethodHook() {
-                        override fun afterHookedMethod(param: MethodHookParam) {
-                            // This fires when a video is shown - good trigger point
-                        }
-                    })
-                log("VideoViewHolder hook OK")
-            }
-        } catch (e: Exception) {
-            log("VideoViewHolder hook: " + e.message)
-        }
-
-        /* ============ 6. Image watermark removal ============ */
-        try {
-            XposedHelpers.findAndHookMethod(
-                "com.ss.ugc.aweme.ImageUrlStruct",
-                lpparam.classLoader, "equals", Object::class.java,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        log("ImageUrlStruct.equals called")
+        // Hook 1b: PanelBuilder buildPanel (second share panel variant)
+        hookByMethodName(
+            "Menu2",
+            "com.ss.android.ugc.aweme.sharer.panelmodel.PanelBuilder\$buildPanel\$1",
+            android.view.View::class.java, "onCreateView",
+            Context::class.java, ViewGroup::class.java,
+            object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    val vg = param.result as? ViewGroup ?: return
+                    if (!vg.javaClass.name.contains("common.keyboard.MeasureLinearLayout")) return
+                    val ctx = vg.context
+                    val isImage = isImageAweme()
+                    val items = listOf(
+                        "????" to Runnable { copyLink(ctx) },
+                        (if (isImage) "????" else "????") to Runnable { download(ctx, if (isImage) 2 else 1) },
+                        "????" to Runnable { download(ctx, 0) }
+                    )
+                    val rv = RecyclerView(ctx).apply {
+                        layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
+                        setPadding(13, 0, 13, 0)
+                        adapter = MenuAdapter(items)
                     }
-                })
-        } catch (_: Exception) {}
-
-        /* ============ 7. Detail Activity hook ============ */
-        try {
-            XposedHelpers.findAndHookMethod(
-                "com.ss.android.ugc.aweme.detail.ui.DetailActivity",
-                lpparam.classLoader, "onCreate", Bundle::class.java,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        log("DetailActivity opened")
+                    vg.addView(rv)
+                    val pb = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal).apply {
+                        max = 100; visibility = View.GONE
                     }
-                })
-        } catch (_: Exception) {}
+                    vg.addView(pb)
+                }
+            })
 
-        log("All hooks initialized!")
+        /* ---- 2. Splash ad + main splash (same as u0/s.java) ---- */
+        hookByMethodName("Ad",
+            "com.bytedance.ies.ugc.aweme.commercialize.splash.show.SplashAdActivity",
+            Void.TYPE, "onCreate", Bundle::class.java,
+            object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    (param.thisObject as? android.app.Activity)?.finish()
+                    log("Blocked splash ad")
+                }
+            })
+
+        hookByMethodName("Splash",
+            "com.ss.android.ugc.aweme.splash.SplashActivity",
+            Void.TYPE, "onCreate", Bundle::class.java,
+            object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    try { XposedHelpers.callMethod(param.thisObject, "goMainActivity") }
+                    catch (_: Exception) { (param.thisObject as? android.app.Activity)?.finish() }
+                    log("Skipped splash")
+                }
+            })
+
+        /* ---- 3. Aweme data capture (same as c1/c.java in Bear) ---- */
+        hookByMethodName("Aweme",
+            "com.ss.android.ugc.aweme.feed.model.Aweme",
+            Boolean::class.javaPrimitiveType, "isAd",
+            object : XC_MethodHook() {
+                override fun afterHookedMethod(param: MethodHookParam) {
+                    currentAweme = param.thisObject
+                    param.result = false
+                }
+            })
+
+        log("All hooks initialized")
     }
 
-    /* ---- Utility methods ---- */
+    /* =========== Menu adapter =========== */
+    data class MenuItem(val label: String, val action: Runnable)
 
-    private fun copyLink(ctx: Context) {
-        try {
-            val aweme = currentAweme ?: return
-            val desc = XposedHelpers.getObjectField(aweme, "desc") as? String ?: ""
-            val url = getVideoUrl(aweme)
-            val text = if (desc.isNotEmpty()) desc + "\\n" + (url ?: "") else (url ?: "")
-            if (text.isNotEmpty()) {
-                (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                    .setPrimaryClip(ClipData.newPlainText("desc", text))
-                toast(ctx, "?????!")
-            }
-        } catch (e: Exception) {
-            toast(ctx, "????")
+    class MenuAdapter(private val items: List<MenuItem>) : RecyclerView.Adapter<MenuAdapter.VH>() {
+        class VH(view: TextView) : RecyclerView.ViewHolder(view)
+        override fun onCreateViewHolder(parent: ViewGroup, vt: Int): VH = VH(
+            TextView(parent.context).apply {
+                textSize = 12f; setTextColor(Color.parseColor("#CCCCCC"))
+                gravity = Gravity.CENTER; setPadding(20, 12, 20, 12)
+            })
+        override fun onBindViewHolder(vh: VH, pos: Int) {
+            (vh.itemView as TextView).text = items[pos].label
+            vh.itemView.setOnClickListener { items[pos].action.run() }
         }
+        override fun getItemCount() = items.size
     }
 
-    private fun download(ctx: Context, type: Int) {
-        try {
-            val aweme = currentAweme ?: return
-            val url = when (type) {
-                0 -> getMusicUrl(aweme)
-                else -> getVideoUrl(aweme)
-            }
-            if (url.isNullOrEmpty()) {
-                toast(ctx, "????????")
-                return
-            }
-            toast(ctx, "????...")
-            Thread {
-                downloadFile(url, type)
-            }.start()
-        } catch (e: Exception) {
-            toast(ctx, "????")
-        }
-    }
-
-    private fun getVideoUrl(aweme: Any): String? {
+    /* =========== Utility =========== */
+    private fun isImageAweme(): Boolean {
         return try {
-            XposedHelpers.callMethod(aweme, "getFirstPlayAddr") as? String
-        } catch (_: Exception) { null }
+            (XposedHelpers.getObjectField(currentAweme, "awemeType") as? Int) == 68
+        } catch (_: Exception) { false }
     }
 
-    private fun getMusicUrl(aweme: Any): String? {
+    private fun getVideoUrl(): String? {
+        return try { XposedHelpers.callMethod(currentAweme, "getFirstPlayAddr") as? String }
+        catch (_: Exception) { null }
+    }
+
+    private fun getMusicUrl(): String? {
         return try {
-            val music = XposedHelpers.getObjectField(aweme, "music")
+            val music = XposedHelpers.getObjectField(currentAweme, "music")
             val playUrl = XposedHelpers.getObjectField(music, "playUrl")
             val urlList = XposedHelpers.callMethod(playUrl, "getUrlList") as? List<*>
             urlList?.firstOrNull()?.toString()
         } catch (_: Exception) { null }
     }
 
-    private fun downloadFile(url: String, type: Int) {
-        try {
-            val conn = URL(url).openConnection() as HttpURLConnection
-            conn.connectTimeout = 15000
-            conn.readTimeout = 60000
-            conn.connect()
-
-            if (conn.responseCode != 200) {
-                log("Download HTTP " + conn.responseCode)
-                return
-            }
-
-            val ext = if (type == 0) ".mp3" else ".mp4"
-            val name = "dy_" + System.currentTimeMillis() + ext
-            val dir = File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                "DouyinHelper"
-            ).apply { if (!exists()) mkdirs() }
-
-            val file = File(dir, name)
-            conn.inputStream.use { input ->
-                FileOutputStream(file).use { output ->
-                    val buf = ByteArray(8192)
-                    var len: Int
-                    var total = 0L
-                    while (input.read(buf).also { len = it } != -1) {
-                        output.write(buf, 0, len)
-                        total += len
-                    }
-                    log("Downloaded: " + file.absolutePath + " (" + total + " bytes)")
-                }
-            }
-            conn.disconnect()
-        } catch (e: Exception) {
-            log("Download error: " + e.message)
+    private fun copyLink(ctx: Context) {
+        val desc = try { XposedHelpers.getObjectField(currentAweme, "desc") as? String ?: "" } catch (_: Exception) { "" }
+        val url = getVideoUrl() ?: ""
+        val text = if (desc.isNotEmpty()) "$desc\n$url" else url
+        if (text.isNotEmpty()) {
+            val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("desc", text))
+            toast(ctx, "???!")
         }
+    }
+
+    private fun download(ctx: Context, type: Int) {
+        val url = when (type) {
+            0 -> getMusicUrl()
+            2 -> null // image download not implemented
+            else -> getVideoUrl()
+        }
+        if (url == null) { toast(ctx, "?????"); return }
+        toast(ctx, "????...")
+        Thread {
+            try {
+                val conn = URL(url).openConnection() as HttpURLConnection
+                conn.connectTimeout = 15000; conn.readTimeout = 60000; conn.connect()
+                if (conn.responseCode != 200) { log("HTTP ${conn.responseCode}"); return@Thread }
+                val ext = if (type == 0) ".mp3" else ".mp4"
+                val name = "dy_${System.currentTimeMillis()}$ext"
+                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DouyinHelper")
+                if (!dir.exists()) dir.mkdirs()
+                val file = File(dir, name)
+                conn.inputStream.use { i -> FileOutputStream(file).use { o -> i.copyTo(o) } }
+                log("Downloaded: $file")
+                conn.disconnect()
+            } catch (e: Exception) { log("Download err: ${e.message}") }
+        }.start()
     }
 }
