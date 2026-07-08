@@ -5,12 +5,13 @@
         gradlePluginPortal()
     }
 }
-dependencyResolution {
-    @Suppress("UnstableApiUsage")
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
     }
 }
-rootProject.name = "DouyinPlus"
-include(":app")
+rootProject.name = "DouyinHelper"
+include ":app"
+
