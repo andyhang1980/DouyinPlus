@@ -26,6 +26,9 @@ jobs:
         with:
           gradle-version: 8.7
 
+      - name: Generate wrapper
+        run: gradle wrapper
+
       - name: Generate debug keystore
         run: |
           keytool -genkey -v \
@@ -37,7 +40,7 @@ jobs:
 
       - name: Build APK
         run: |
-          gradle assembleRelease \
+          ./gradlew assembleRelease \
             -Pandroid.injected.signing.store.file=debug.jks \
             -Pandroid.injected.signing.store.password=android \
             -Pandroid.injected.signing.key.alias=debug \
@@ -46,7 +49,7 @@ jobs:
       - name: Collect APK
         run: |
           mkdir -p dist
-          find app/build/outputs/apk -name "*.apk" -exec cp {} dist/ \;
+          find app/build -name "*.apk" -exec cp {} dist/ \;
           ls -la dist/
 
       - name: Upload APK
@@ -71,7 +74,7 @@ jobs:
         with:
           tag_name: CI
           name: CI Build
-          body: "Auto-built from latest main branch.\n\nInstall via LSPosed Manager -> Modules -> Enable DouyinPlus."
+          body: "Auto-built from latest main branch."
           files: apk/*.apk
           prerelease: true
         env:
