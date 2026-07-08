@@ -23,6 +23,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
 
       - name: Generate debug keystore
         run: |
@@ -41,11 +43,17 @@ jobs:
             -Pandroid.injected.signing.key.alias=debug \
             -Pandroid.injected.signing.key.password=android
 
+      - name: Collect APK
+        run: |
+          mkdir -p dist
+          find app/build/outputs/apk -name "*.apk" -exec cp {} dist/ \;
+          ls -la dist/
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: DouyinPlus-APK
-          path: app/build/outputs/apk/release/*.apk
+          path: dist/*.apk
 
   release:
     needs: build
@@ -63,7 +71,7 @@ jobs:
         with:
           tag_name: CI
           name: CI Build
-          body: "Auto-built from latest main. Install via LSPosed."
+          body: "Auto-built from latest main branch.\n\nInstall via LSPosed Manager -> Modules -> Enable DouyinPlus."
           files: apk/*.apk
           prerelease: true
         env:
