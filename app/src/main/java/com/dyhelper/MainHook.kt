@@ -215,7 +215,7 @@ class MainHook : IXposedHookLoadPackage {
             val aweme = currentAweme ?: return
             val desc = XposedHelpers.getObjectField(aweme, "desc") as? String ?: ""
             val url = getVideoUrl(aweme)
-            val text = if (desc.isNotEmpty()) desc + "\n" + url else url
+            val text = if (desc.isNotEmpty()) desc + "\\n" + (url ?: "") else (url ?: "")
             if (text.isNotEmpty()) {
                 (ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
                     .setPrimaryClip(ClipData.newPlainText("desc", text))
