@@ -1,4 +1,4 @@
-﻿package com.dyhelper.adaptive
+package com.dyhelper.adaptive
 
 import android.content.Context
 import android.content.SharedPreferences

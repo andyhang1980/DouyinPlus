@@ -1,4 +1,4 @@
-﻿package com.dyhelper.data
+package com.dyhelper.data
 
 import de.robv.android.xposed.XposedHelpers
 

@@ -1,4 +1,4 @@
-﻿# 抖音小能手 (DouyinPlus)
+# 抖音小能手 (DouyinPlus)
 
 抖音 LSPosed 模块，支持自适应适配（自动发现不同版本的目标类名）。
 

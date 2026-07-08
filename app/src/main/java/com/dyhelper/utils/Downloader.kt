@@ -1,4 +1,4 @@
-﻿package com.dyhelper.utils
+package com.dyhelper.utils
 
 import android.os.Environment
 import android.widget.ProgressBar

@@ -1,4 +1,4 @@
-﻿package com.dyhelper.adaptive
+package com.dyhelper.adaptive
 
 import com.dyhelper.MainHook
 import com.dyhelper.adaptive.ClassScanner.ClassFingerprint
