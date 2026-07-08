@@ -4,11 +4,11 @@
 }
 
 android {
-    namespace "com.douyinplus"
+    namespace "com.dyhelper"
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.douyinplus"
+        applicationId "com.dyhelper"
         minSdk 26
         targetSdk 34
         versionCode 1
@@ -35,3 +35,6 @@ dependencies {
     compileOnly "de.robv.android.xposed:api:82"
     implementation "androidx.core:core-ktx:1.12.0"
 }
+
+
+
