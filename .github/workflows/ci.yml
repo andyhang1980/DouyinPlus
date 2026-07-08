@@ -27,16 +27,6 @@ jobs:
           echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=${ANDROID_HOME}" >> $GITHUB_ENV
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" 2>/dev/null || true
-
-      - name: Download Xposed API
-        run: |
-          mkdir -p app/libs
-          wget -q -O app/libs/api-82.jar \
-            "https://github.com/rovo89/XposedBridge/raw/art/app/api-82.jar" || \
-          wget -q -O app/libs/api-82.jar \
-            "https://repo1.maven.org/maven2/de/robv/android/xposed/api/82/api-82.jar" || \
-          echo "WARNING: Could not download Xposed API jar"
-
       - name: Download Gradle
         run: |
           wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
@@ -81,19 +71,18 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: "build-${{ steps.slug.outputs.sha }}"
-          name: "Build ${{ steps.slug.outputs.sha }} (抖音小能手)"
+          name: "Build ${{ steps.slug.outputs.sha }} (鎶栭煶灏忚兘鎵?"
           files: apk/*.apk
           prerelease: true
           body: |
-            ## 抖音小能手 - 自动构建 v1.1
+            ## 鎶栭煶灏忚兘鎵?- 鑷姩鏋勫缓 v1.1
             
             - Commit: ${{ github.sha }}
-            - 功能: 去广告 · 无水印下载 · 音频下载 · 复制链接 · 自适应适配
+            - 鍔熻兘: 鍘诲箍鍛?路 鏃犳按鍗颁笅杞?路 闊抽涓嬭浇 路 澶嶅埗閾炬帴 路 鑷€傚簲閫傞厤
             
-            ### 安装
-            1. 确保已安装 LSPosed 框架
-            2. 安装此 APK
-            3. 在 LSPosed 中启用模块并勾选抖音
-            4. 重启抖音
+            ### 瀹夎
+            1. 纭繚宸插畨瑁?LSPosed 妗嗘灦
+            2. 瀹夎姝?APK
+            3. 鍦?LSPosed 涓惎鐢ㄦā鍧楀苟鍕鹃€夋姈闊?            4. 閲嶅惎鎶栭煶
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
