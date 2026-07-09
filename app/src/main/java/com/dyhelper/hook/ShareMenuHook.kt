@@ -80,8 +80,7 @@ class ShareMenuHook(
 
     private fun hookOnMeasure(cls: Class<*>, intType: Class<*>): Boolean {
         for (m in cls.declaredMethods) {
-            if (m.name == "onMeasure" && m.returnType == Void.TYPE &&
-                m.parameterTypes.size == 2 &&
+            if (m.name == "onMeasure" && m.parameterTypes.size == 2 &&
                 m.parameterTypes[0] == intType &&
                 m.parameterTypes[1] == intType) {
                 m.isAccessible = true
