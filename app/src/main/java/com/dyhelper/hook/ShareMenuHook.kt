@@ -10,7 +10,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
@@ -80,7 +79,9 @@ class ShareMenuHook(
 
             val actions = listOf(
                 "\u590D\u5236\u94FE\u63A5" to { copyFn(ctx) },
-                (if (checkImage()) "\u4E0B\u8F7D\u56FE\u7247" else "\u4E0B\u8F7D\u89C6\u9891") to { if (checkImage()) imageFn(ctx) else videoFn(ctx) },
+                (if (checkImage()) "\u4E0B\u8F7D\u56FE\u7247" else "\u4E0B\u8F7D\u89C6\u9891") to {
+                    if (checkImage()) imageFn(ctx) else videoFn(ctx)
+                },
                 "\u4E0B\u8F7D\u97F3\u9891" to { audioFn(ctx) }
             )
             for ((label, fn) in actions) {
@@ -115,7 +116,6 @@ class ShareMenuHook(
         bg.setStroke(dp(ctx, 1), Color.parseColor("#22000000"))
         bar.background = bg
         bar.setPadding(dp(ctx, 10), dp(ctx, 10), dp(ctx, 10), dp(ctx, 10))
-
         bar.addView(itemColumn(ctx, "\u{1F4BE}", "\u4FDD\u5B58") { showActionSheet(ctx) })
         bar.addView(itemColumn(ctx, "\u{1F517}", "\u590D\u5236") { copyFn(ctx) })
         bar.addView(itemColumn(ctx, "\u{1F4F9}", if (checkImage()) "\u56FE\u7247" else "\u89C6\u9891") {
@@ -130,8 +130,10 @@ class ShareMenuHook(
         if (!cl.contains("socialactionspanel") && !cl.contains("imshare")) return
         if (rv.visibility != View.VISIBLE) return
 
+        // 向上找一个 ViewGroup 父级来添加
+        var cur: View = rv
         for (i in 0..5) {
-            val parent = rv.parent as? ViewGroup ?: break
+            val parent = cur.parent as? ViewGroup ?: break
             val tag = "dyhelper_menu_row"
             if (parent.findViewWithTag<View>(tag) != null) return
 
