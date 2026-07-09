@@ -1,4 +1,4 @@
-﻿package com.dyhelper
+package com.dyhelper
 
 import android.app.Application
 import android.content.Context

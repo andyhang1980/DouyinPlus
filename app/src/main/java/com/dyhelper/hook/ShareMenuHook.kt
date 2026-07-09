@@ -1,4 +1,4 @@
-﻿package com.dyhelper.hook
+package com.dyhelper.hook
 
 import android.app.Dialog
 import android.content.Context

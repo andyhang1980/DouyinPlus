@@ -1,4 +1,4 @@
-﻿package com.dyhelper.hook
+package com.dyhelper.hook
 
 import com.dyhelper.util.ClassFinder
 import com.dyhelper.util.HookUtils

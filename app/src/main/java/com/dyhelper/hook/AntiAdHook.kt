@@ -1,4 +1,4 @@
-﻿package com.dyhelper.hook
+package com.dyhelper.hook
 
 import android.os.Bundle
 import com.dyhelper.util.ClassFinder

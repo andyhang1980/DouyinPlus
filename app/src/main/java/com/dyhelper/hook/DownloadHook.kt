@@ -1,4 +1,4 @@
-﻿package com.dyhelper.hook
+package com.dyhelper.hook
 
 import android.content.ClipData
 import android.content.ClipboardManager

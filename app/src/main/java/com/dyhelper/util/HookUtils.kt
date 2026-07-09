@@ -1,4 +1,4 @@
-﻿package com.dyhelper.util
+package com.dyhelper.util
 
 import de.robv.android.xposed.XposedBridge
 
