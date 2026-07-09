@@ -20,25 +20,22 @@ jobs:
       - name: Setup Android SDK
         run: |
           echo ANDROID_HOME=${ANDROID_HOME} >> $GITHUB_ENV
-          echo ANDROID_SDK_ROOT=${ANDROID_HOME} >> $GITHUB_ENV
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" 2>/dev/null || true
-      - name: Give gradlew execute permission
-        run: chmod +x gradlew
-      - name: Generate keystore
-        run: keytool -genkey -v -keystore app/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname CN=Debug
-      - name: Build APK
-        run: |
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/debug.keystore \
-            -Pandroid.injected.signing.store.password=android \
-            -Pandroid.injected.signing.key.alias=androiddebugkey \
-            -Pandroid.injected.signing.key.password=android \
-            --no-daemon --stacktrace
+      - name: Make gradlew executable
+        run: chmod +x gradlew && ls -la gradlew
+      - name: Which gradle
+        run: which gradle && gradle --version 2>/dev/null || echo "no global gradle"
+      - name: Try build debug first
+        run: ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -n 100
+      - name: Build release
+        run: ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tail -n 150
       - uses: actions/upload-artifact@v4
         if: success()
         with:
           name: APK
-          path: app/build/outputs/apk/release/*.apk
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/debug/*.apk
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -51,14 +48,15 @@ jobs:
       - name: Get SHA
         id: slug
         run: echo sha=$(echo $GITHUB_SHA | cut -c1-7) >> $GITHUB_OUTPUT
-      - name: List APKs
-        run: ls -la apk/
       - name: Release
         run: |
-          APK=$(ls apk/*.apk | head -n1)
+          ls -la apk/
+          APK=$(ls apk/*release*.apk 2>/dev/null | head -n1)
+          if [ -z "$APK" ]; then APK=$(ls apk/*.apk | head -n1); fi
           mv "$APK" apk/DY.apk
+          ls -la apk/
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ steps.slug.outputs.sha }}
-          name: DY++ v3.2.0
+          name: DY v3.2.0
           files: apk/DY.apk
