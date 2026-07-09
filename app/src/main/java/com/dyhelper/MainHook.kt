@@ -14,7 +14,6 @@ import com.dyhelper.hook.ShareMenuHook
 import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 class MainHook : IXposedHookLoadPackage {
@@ -22,7 +21,7 @@ class MainHook : IXposedHookLoadPackage {
     companion object {
         var classLoader: ClassLoader? = null
         private var inited = false
-        const val VERSION = "3.1.2-dy395"
+        const val VERSION = "3.1.3-dy395"
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -33,9 +32,8 @@ class MainHook : IXposedHookLoadPackage {
         HookUtils.log("=== DH v$VERSION $pkg ===")
 
         try {
-            val m = Application::class.java.getDeclaredMethod("attach", Context::class.java)
-            m.isAccessible = true
-            XposedBridge.hookMethod(m, object : XC_MethodHook() {
+            // Use hookAllMethods (LSPosed-safe) instead of hookMethod(Member, ...)
+            HookUtils.hookOneMethod(Application::class.java, "attach", object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     if (inited) return
                     inited = true
@@ -44,13 +42,19 @@ class MainHook : IXposedHookLoadPackage {
                     initAll(ctx)
                 }
             })
+            HookUtils.log("Application.attach hook OK")
         } catch (t: Throwable) {
             HookUtils.log("MainHook err: " + t.message)
         }
     }
 
     private fun initAll(ctx: Context) {
-        val loader = classLoader ?: return
+        val loader = classLoader ?: run {
+            HookUtils.log("initAll: no classLoader!")
+            return
+        }
+        HookUtils.log("initAll: loader=" + loader.javaClass.name)
+
         val cap = DataCaptureHook()
         val dl = DownloadHook(cap)
 
@@ -81,8 +85,8 @@ class MainHook : IXposedHookLoadPackage {
         }
 
         val total = hooks.size
-        val msg = if (ok == total) "u81EAu52A8u9002u914Du5B8Cu6210 $ok/$total $names"
-                  else "u81EAu52A8u9002u914D: $ok/$total $names"
+        val msg = if (ok == total) "\u81EA\u52A8\u9002\u914D\u5B8C\u6210 $ok/$total $names"
+                  else "\u81EA\u52A8\u9002\u914D: $ok/$total $names"
 
         Handler(Looper.getMainLooper()).postDelayed({
             val t = Toast.makeText(ctx, msg, Toast.LENGTH_LONG)

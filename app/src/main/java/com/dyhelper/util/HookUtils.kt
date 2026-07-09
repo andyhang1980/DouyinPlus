@@ -1,5 +1,6 @@
 package com.dyhelper.util
 
+import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 
 object HookUtils {
@@ -13,9 +14,7 @@ object HookUtils {
                 val f = cls.getDeclaredField(name)
                 f.isAccessible = true
                 return f.get(obj)
-            } catch (_: NoSuchFieldException) {
-                cls = cls.superclass
-            }
+            } catch (_: NoSuchFieldException) { cls = cls.superclass }
         }
         throw NoSuchFieldException(name)
     }
@@ -28,17 +27,29 @@ object HookUtils {
                 val m = cls.getDeclaredMethod(name)
                 m.isAccessible = true
                 return m.invoke(obj)
-            } catch (_: NoSuchMethodException) {
-                cls = cls.superclass
-            }
+            } catch (_: NoSuchMethodException) { cls = cls.superclass }
         }
         throw NoSuchMethodException(name)
     }
 
     /** Safe findClass that returns null instead of throwing */
     fun findClass(loader: ClassLoader, name: String): Class<*>? {
+        return try { Class.forName(name, false, loader) } catch (_: Exception) { null }
+    }
+
+    /** Hook a single method by class+name (uses hookAllMethods, LSPosed-safe) */
+    fun hookOneMethod(cls: Class<*>, methodName: String, callback: XC_MethodHook) {
+        XposedBridge.hookAllMethods(cls, methodName, callback)
+    }
+
+    /** Try to find and hook a method across class hierarchy */
+    fun tryHookMethod(cls: Class<*>, methodName: String, callback: XC_MethodHook): Boolean {
         return try {
-            Class.forName(name, false, loader)
-        } catch (_: Exception) { null }
+            XposedBridge.hookAllMethods(cls, methodName, callback)
+            true
+        } catch (t: Throwable) {
+            log("tryHookMethod $methodName on " + cls.name + " err: " + t.message)
+            false
+        }
     }
 }

@@ -3,7 +3,6 @@ package com.dyhelper.hook
 import com.dyhelper.util.ClassFinder
 import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 
 class DataCaptureHook : BaseHook {
     companion object {
@@ -51,47 +50,33 @@ class DataCaptureHook : BaseHook {
     }
 
     private fun hookIsAd(cls: Class<*>): Boolean {
-        for (m in cls.declaredMethods) {
-            if (m.name == "isAd" && m.returnType == Boolean::class.javaPrimitiveType &&
-                m.parameterTypes.isEmpty()) {
-                m.isAccessible = true
-                XposedBridge.hookMethod(m, object : XC_MethodHook() {
-                    override fun afterHookedMethod(p: MethodHookParam) {
-                        currentAweme = p.thisObject
-                        p.result = false
-                    }
-                })
-                HookUtils.log("[Data] isAd hooked: " + cls.name)
-                return true
-            }
+        // Verify the class has isAd() -> boolean
+        val hasIsAd = cls.declaredMethods.any {
+            it.name == "isAd" && it.returnType == Boolean::class.javaPrimitiveType && it.parameterTypes.isEmpty()
         }
-        return false
+        if (!hasIsAd) return false
+        HookUtils.hookOneMethod(cls, "isAd", object : XC_MethodHook() {
+            override fun afterHookedMethod(p: MethodHookParam) {
+                currentAweme = p.thisObject
+                p.result = false
+            }
+        })
+        HookUtils.log("[Data] isAd hooked: " + cls.name)
+        return true
     }
 
     fun isImage(): Boolean {
         val aweme = currentAweme ?: return false
-        try {
-            val at = HookUtils.getField(aweme, "awemeType") as? Int
-            if (at != null) return at == 68
-        } catch (_: Exception) {}
-        try {
-            val img = HookUtils.callMethod(aweme, "isImage") as? Boolean
-            if (img != null) return img
-        } catch (_: Exception) {}
-        try {
-            val at2 = HookUtils.callMethod(aweme, "getAwemeType") as? Int
-            if (at2 != null) return at2 == 68
-        } catch (_: Exception) {}
+        try { val at = HookUtils.getField(aweme, "awemeType") as? Int; if (at != null) return at == 68 } catch (_: Exception) {}
+        try { val img = HookUtils.callMethod(aweme, "isImage") as? Boolean; if (img != null) return img } catch (_: Exception) {}
+        try { val at2 = HookUtils.callMethod(aweme, "getAwemeType") as? Int; if (at2 != null) return at2 == 68 } catch (_: Exception) {}
         return false
     }
 
     fun getVideoUrl(): String? {
         val aweme = currentAweme ?: return null
-        for (methodName in listOf("getFirstPlayAddr", "getVideoPlayAddr", "getOriginPlayAddr", "getDownloadAddr")) {
-            try {
-                val url = HookUtils.callMethod(aweme, methodName) as? String
-                if (!url.isNullOrEmpty()) return extractUrl(url)
-            } catch (_: Exception) {}
+        for (mn in listOf("getFirstPlayAddr", "getVideoPlayAddr", "getOriginPlayAddr", "getDownloadAddr")) {
+            try { val url = HookUtils.callMethod(aweme, mn) as? String; if (!url.isNullOrEmpty()) return extractUrl(url) } catch (_: Exception) {}
         }
         try {
             val video = HookUtils.getField(aweme, "video")!!
@@ -114,9 +99,7 @@ class DataCaptureHook : BaseHook {
     }
 
     fun getDesc(): String {
-        return try {
-            HookUtils.getField(currentAweme!!, "desc") as? String ?: ""
-        } catch (_: Exception) { "" }
+        return try { HookUtils.getField(currentAweme!!, "desc") as? String ?: "" } catch (_: Exception) { "" }
     }
 
     private fun extractUrl(raw: String): String {
