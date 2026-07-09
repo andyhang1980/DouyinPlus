@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id "com.android.application"
     id "org.jetbrains.kotlin.android"
 }
@@ -11,8 +11,8 @@ android {
         applicationId "com.dyhelper"
         minSdk 26
         targetSdk 34
-        versionCode 5
-        versionName "2.0"
+        versionCode 6
+        versionName "3.1.0"
     }
 
     buildTypes {
@@ -29,6 +29,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all {
+            outputFileName = "抖音小能手-v${variant.versionName}.apk"
+        }
+    }
 }
 
 dependencies {
@@ -36,3 +42,4 @@ dependencies {
     implementation "androidx.core:core-ktx:1.12.0"
     implementation "androidx.recyclerview:recyclerview:1.3.2"
 }
+
