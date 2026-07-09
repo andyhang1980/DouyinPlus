@@ -1,4 +1,4 @@
-package com.dyhelper.hook
+﻿package com.dyhelper.hook
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -23,23 +23,25 @@ class DownloadHook(private val c: DataCaptureHook) {
         if (text.isNotEmpty()) {
             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("desc", text))
-            toast(ctx, "u5DF2u590Du5236")
+            toast(ctx, "\u5DF2\u590D\u5236\u94FE\u63A5")
+        } else {
+            toast(ctx, "\u672A\u83B7\u53D6\u5230\u94FE\u63A5")
         }
     }
 
-    fun video(ctx: Context) { dl(ctx, c.getVideoUrl(), ".mp4") }
-    fun audio(ctx: Context) { dl(ctx, c.getMusicUrl(), ".mp3") }
+    fun video(ctx: Context) { dl(ctx, c.getVideoUrl(), ".mp4", "\u89C6\u9891") }
+    fun audio(ctx: Context) { dl(ctx, c.getMusicUrl(), ".mp3", "\u97F3\u9891") }
     fun image(ctx: Context) {
         val url = c.getVideoUrl() ?: c.getMusicUrl()
-        dl(ctx, url, ".jpg")
+        dl(ctx, url, ".jpg", "\u56FE\u7247")
     }
 
-    private fun dl(ctx: Context, url: String?, ext: String) {
+    private fun dl(ctx: Context, url: String?, ext: String, label: String) {
         if (url == null || url.isEmpty()) {
-            toast(ctx, "u83B7u53D6u94FEu63A5u5931u8D25")
+            toast(ctx, "\u83B7\u53D6" + label + "\u94FE\u63A5\u5931\u8D25")
             return
         }
-        toast(ctx, "u5F00u59CBu4E0Bu8F7D...")
+        toast(ctx, "\u5F00\u59CB\u4E0B\u8F7D" + label + "...")
         Thread {
             try {
                 val conn = URL(url).openConnection() as HttpURLConnection
@@ -49,7 +51,7 @@ class DownloadHook(private val c: DataCaptureHook) {
                 conn.instanceFollowRedirects = true
                 conn.connect()
                 if (conn.responseCode != 200) {
-                    toast(ctx, "u4E0Bu8F7Du5931u8D25: HTTP " + conn.responseCode)
+                    toast(ctx, "\u4E0B\u8F7D\u5931\u8D25: HTTP " + conn.responseCode)
                     return@Thread
                 }
                 val name = "dy_" + System.currentTimeMillis() + ext
@@ -65,9 +67,9 @@ class DownloadHook(private val c: DataCaptureHook) {
                     }
                 }
                 conn.disconnect()
-                toast(ctx, "u4E0Bu8F7Du5B8Cu6210: " + file.name)
+                toast(ctx, label + "\u4E0B\u8F7D\u5B8C\u6210: " + file.name)
             } catch (e: Exception) {
-                toast(ctx, "u9519u8BEF: " + (e.message ?: "unknown"))
+                toast(ctx, "\u9519\u8BEF: " + (e.message ?: "unknown"))
             }
         }.start()
     }

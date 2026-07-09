@@ -19,7 +19,12 @@ import de.robv.android.xposed.XposedHelpers
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 class MainHook : IXposedHookLoadPackage {
-    companion object { var classLoader: ClassLoader? = null; var appContext: Context? = null; private var inited = false; const val VERSION = "3.2.0" }
+    companion object {
+        var classLoader: ClassLoader? = null
+        var appContext: Context? = null
+        private var inited = false
+        const val VERSION = "3.2.0"
+    }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         val pkg = lpparam.packageName
@@ -28,7 +33,6 @@ class MainHook : IXposedHookLoadPackage {
         HookUtils.log("=== DH v$VERSION $pkg ===")
         HookUtils.log("Bridge: " + XposedBridge::class.java.name)
 
-        // Use hookAllMethods via reflection (works on LSPosed)
         try {
             val appClass = XposedHelpers.findClass("android.app.Application", lpparam.classLoader)
             if (HookUtils.hookAllMethods(appClass, "attach", object : XC_MethodHook() {

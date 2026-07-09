@@ -33,33 +33,23 @@ class ShareMenuHook(
     private fun dp(ctx: Context, v: Float): Int =
         TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, ctx.resources.displayMetrics).toInt()
 
-    private fun circleBg(ctx: Context, sizeDp: Int): View {
-        val v = View(ctx)
-        val bg = GradientDrawable()
-        bg.shape = GradientDrawable.OVAL
-        bg.setColor(Color.parseColor("#1A000000"))
-        v.background = bg
-        v.layoutParams = LinearLayout.LayoutParams(dp(ctx, sizeDp.toFloat()), dp(ctx, sizeDp.toFloat()))
-        return v
-    }
-
-    private fun itemColumn(ctx: Context, iconChar: String, label: String, onTap: () -> Unit): LinearLayout {
+    private fun itemColumn(ctx: Context, iconText: String, label: String, onTap: () -> Unit): LinearLayout {
         val col = LinearLayout(ctx)
         col.orientation = LinearLayout.VERTICAL
         col.gravity = Gravity.CENTER
-        col.setPadding(dp(ctx, 10), dp(ctx, 4), dp(ctx, 10), dp(ctx, 4))
+        col.setPadding(dp(ctx, 12), dp(ctx, 4), dp(ctx, 12), dp(ctx, 4))
 
         val tvIcon = TextView(ctx)
-        tvIcon.text = iconChar
-        tvIcon.textSize = 18f
+        tvIcon.text = iconText
+        tvIcon.textSize = 16f
         tvIcon.gravity = Gravity.CENTER
         tvIcon.setTextColor(Color.WHITE)
-
         val bg = GradientDrawable()
         bg.shape = GradientDrawable.OVAL
         bg.setColor(Color.parseColor("#FF2D555F"))
         tvIcon.background = bg
-        tvIcon.layoutParams = LinearLayout.LayoutParams(dp(ctx, 38), dp(ctx, 38))
+        val iconSize = dp(ctx, 38)
+        tvIcon.layoutParams = LinearLayout.LayoutParams(iconSize, iconSize)
 
         val tvLabel = TextView(ctx)
         tvLabel.text = label
@@ -73,40 +63,46 @@ class ShareMenuHook(
         return col
     }
 
-    private fun dialogRow(ctx: Context, label: String, onTap: () -> Unit): TextView {
-        val tv = TextView(ctx)
-        tv.text = label
-        tv.textSize = 16f
-        tv.setTextColor(Color.parseColor("#111111"))
-        tv.setPadding(dp(ctx, 16), dp(ctx, 14), dp(ctx, 16), dp(ctx, 14))
-        tv.setOnClickListener { onTap() }
-        return tv
-    }
-
     private fun showActionSheet(ctx: Context) {
-        val dlg = XposedHelpers.newInstance(Class.forName("android.app.Dialog"), ctx)
-        val container = LinearLayout(ctx)
-        container.orientation = LinearLayout.VERTICAL
-        container.setBackgroundColor(Color.WHITE)
-        container.setPadding(dp(ctx, 18), dp(ctx, 16), dp(ctx, 18), dp(ctx, 16))
+        try {
+            val dlg = XposedHelpers.newInstance(Class.forName("android.app.Dialog"), ctx)
+            val container = LinearLayout(ctx)
+            container.orientation = LinearLayout.VERTICAL
+            container.setBackgroundColor(Color.WHITE)
+            container.setPadding(dp(ctx, 18), dp(ctx, 16), dp(ctx, 18), dp(ctx, 16))
 
-        container.addView(dialogRow(ctx, "\u590D\u5236\u94FE\u63A5") {
-            copyFn(ctx)
-            try { XposedHelpers.callMethod(dlg, "dismiss") } catch (_: Throwable) {}
-        })
-        container.addView(dialogRow(ctx, if (checkImage()) "\u4E0B\u8F7D\u56FE\u7247" else "\u4E0B\u8F7D\u89C6\u9891") {
-            if (checkImage()) imageFn(ctx) else videoFn(ctx)
-            try { XposedHelpers.callMethod(dlg, "dismiss") } catch (_: Throwable) {}
-        })
-        container.addView(dialogRow(ctx, "\u4E0B\u8F7D\u97F3\u9891") {
-            audioFn(ctx)
-            try { XposedHelpers.callMethod(dlg, "dismiss") } catch (_: Throwable) {}
-        })
+            val title = TextView(ctx)
+            title.text = "\u64CD\u4F5C"
+            title.textSize = 18f
+            title.setTextColor(Color.parseColor("#111111"))
+            title.setPadding(0, 0, 0, dp(ctx, 12))
+            container.addView(title)
 
-        XposedHelpers.callMethod(dlg, "setContentView", container)
-        val window = XposedHelpers.callMethod(dlg, "window")
-        if (window != null) XposedHelpers.callMethod(window, "setGravity", Gravity.BOTTOM)
-        try { XposedHelpers.callMethod(dlg, "show") } catch (_: Throwable) {}
+            val actions = listOf(
+                "\u590D\u5236\u94FE\u63A5" to { copyFn(ctx) },
+                (if (checkImage()) "\u4E0B\u8F7D\u56FE\u7247" else "\u4E0B\u8F7D\u89C6\u9891") to { if (checkImage()) imageFn(ctx) else videoFn(ctx) },
+                "\u4E0B\u8F7D\u97F3\u9891" to { audioFn(ctx) }
+            )
+            for ((label, fn) in actions) {
+                val tv = TextView(ctx)
+                tv.text = label
+                tv.textSize = 16f
+                tv.setTextColor(Color.parseColor("#222222"))
+                tv.setPadding(0, dp(ctx, 12), 0, dp(ctx, 12))
+                tv.setOnClickListener {
+                    try { fn() } catch (_: Throwable) {}
+                    try { XposedHelpers.callMethod(dlg, "dismiss") } catch (_: Throwable) {}
+                }
+                container.addView(tv)
+            }
+
+            XposedHelpers.callMethod(dlg, "setContentView", container)
+            val window = XposedHelpers.callMethod(dlg, "window")
+            if (window != null) XposedHelpers.callMethod(window, "setGravity", Gravity.BOTTOM)
+            XposedHelpers.callMethod(dlg, "show")
+        } catch (t: Throwable) {
+            HookUtils.log("$TAG dialog err: " + t.message)
+        }
     }
 
     private fun buildBar(ctx: Context): LinearLayout {
@@ -120,53 +116,55 @@ class ShareMenuHook(
         bar.background = bg
         bar.setPadding(dp(ctx, 10), dp(ctx, 10), dp(ctx, 10), dp(ctx, 10))
 
-        val padLR = dp(ctx, 12)
         bar.addView(itemColumn(ctx, "\u{1F4BE}", "\u4FDD\u5B58") { showActionSheet(ctx) })
         bar.addView(itemColumn(ctx, "\u{1F517}", "\u590D\u5236") { copyFn(ctx) })
         bar.addView(itemColumn(ctx, "\u{1F4F9}", if (checkImage()) "\u56FE\u7247" else "\u89C6\u9891") {
             if (checkImage()) imageFn(ctx) else videoFn(ctx)
         })
         bar.addView(itemColumn(ctx, "\u{1F3B5}", "\u97F3\u9891") { audioFn(ctx) })
-
-        for (i in 0 until bar.childCount) {
-            val lp = bar.getChildAt(i).layoutParams as LinearLayout.LayoutParams
-            lp.topMargin = 0; lp.bottomMargin = 0
-        }
         return bar
     }
 
-    private fun tryInject(v: View) {
-        val rv = v as? RecyclerView ?: return
+    private fun tryInject(rv: RecyclerView) {
         val cl = rv.javaClass.name.lowercase()
         if (!cl.contains("socialactionspanel") && !cl.contains("imshare")) return
+        if (rv.visibility != View.VISIBLE) return
 
-        for (i in 0..6) {
-            val ancestor = rv.parent ?: break
-            val ap = ancestor as? ViewGroup ?: break
-            if (ap.javaClass.name.lowercase().contains("frame") || ap.javaClass.name.lowercase().contains("linear")) {
-                val tag = "dyhelper_menu_row"
-                if (ap.findViewWithTag<View>(tag) != null) return
-                val bar = buildBar(rv.context)
-                bar.tag = tag
-                val lp = if (ap is FrameLayout) {
-                    FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                        gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                        leftMargin = dp(rv.context, 12f)
-                        rightMargin = dp(rv.context, 12f)
-                    }
-                } else {
-                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                        gravity = Gravity.CENTER_HORIZONTAL
-                        topMargin = dp(rv.context, 8f)
-                        bottomMargin = dp(rv.context, 8f)
-                    }
+        for (i in 0..5) {
+            val parent = rv.parent as? ViewGroup ?: break
+            val tag = "dyhelper_menu_row"
+            if (parent.findViewWithTag<View>(tag) != null) return
+
+            val bar = buildBar(rv.context)
+            bar.tag = tag
+            val lp: ViewGroup.LayoutParams = when (parent) {
+                is FrameLayout -> FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                    leftMargin = dp(rv.context, 12f)
+                    rightMargin = dp(rv.context, 12f)
+                    bottomMargin = dp(rv.context, 60f)
                 }
-                ap.addView(bar, lp)
-                HookUtils.log("$TAG bar injected into " + ap.javaClass.simpleName)
-                return
+                is LinearLayout -> LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    topMargin = dp(rv.context, 8f)
+                    bottomMargin = dp(rv.context, 8f)
+                }
+                else -> ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
             }
-            rv.parent?.parent?.let { rv.parent }?.let { break }
+            parent.addView(bar, lp)
+            HookUtils.log("$TAG bar injected into " + parent.javaClass.simpleName + " at depth $i")
+            return
         }
+        HookUtils.log("$TAG no parent found after 6 levels")
     }
 
     override fun init(loader: ClassLoader): Boolean {
@@ -175,12 +173,14 @@ class ShareMenuHook(
             val rv = Class.forName("androidx.recyclerview.widget.RecyclerView", false, loader)
             if (HookUtils.hookAllMethods(rv, "onLayout", object : XC_MethodHook() {
                 override fun afterHookedMethod(p: MethodHookParam) {
-                    try { tryInject(p.thisObject as? RecyclerView ?: return) } catch (t: Throwable) { HookUtils.log("$TAG layout: " + t.message) }
+                    try {
+                        val v = p.thisObject as? RecyclerView ?: return
+                        tryInject(v)
+                    } catch (t: Throwable) { HookUtils.log("$TAG layout: " + t.message) }
                 }
             })) { HookUtils.log("$TAG RecyclerView.onLayout ok"); ok = true }
         } catch (t: Throwable) { HookUtils.log("$TAG rv: " + t.message) }
 
-        // Second pass: setVisibility 可见时再试
         try {
             val vv = Class.forName("android.view.View", false, loader)
             if (HookUtils.hookAllMethods(vv, "setVisibility", object : XC_MethodHook() {
@@ -188,7 +188,9 @@ class ShareMenuHook(
                     try {
                         val v = p.thisObject as? RecyclerView ?: return
                         if (p.args[0] as? Int != View.VISIBLE) return
-                        Handler(Looper.getMainLooper()).postDelayed({ tryInject(v) }, 120)
+                        val cl = v.javaClass.name.lowercase()
+                        if (!cl.contains("socialactionspanel") && !cl.contains("imshare")) return
+                        Handler(Looper.getMainLooper()).postDelayed({ tryInject(v) }, 150)
                     } catch (_: Throwable) {}
                 }
             })) { HookUtils.log("$TAG setVisibility ok"); ok = true }
