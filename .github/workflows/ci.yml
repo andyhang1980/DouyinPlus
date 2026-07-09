@@ -22,17 +22,20 @@ jobs:
           echo ANDROID_HOME=${ANDROID_HOME} >> $GITHUB_ENV
           echo ANDROID_SDK_ROOT=${ANDROID_HOME} >> $GITHUB_ENV
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" 2>/dev/null || true
-      - name: Download Gradle
-        run: |
-          wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
-          unzip -q gradle-8.7-bin.zip
-          echo $PWD/gradle-8.7/bin >> $GITHUB_PATH
+      - name: Give gradlew execute permission
+        run: chmod +x gradlew
       - name: Generate keystore
-        run: keytool -genkey -v -keystore ${{ github.workspace }}/app/debug.jks -alias debug -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname CN=Debug
-      - name: Build
+        run: keytool -genkey -v -keystore app/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname CN=Debug
+      - name: Build APK
         run: |
-          gradle assembleRelease --no-daemon -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/debug.jks -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=debug -Pandroid.injected.signing.key.password=android
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/debug.keystore \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android \
+            --no-daemon --stacktrace
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: APK
           path: app/build/outputs/apk/release/*.apk
@@ -48,8 +51,12 @@ jobs:
       - name: Get SHA
         id: slug
         run: echo sha=$(echo $GITHUB_SHA | cut -c1-7) >> $GITHUB_OUTPUT
-      - name: Rename
-        run: mv apk/app-release.apk apk/DY.apk
+      - name: List APKs
+        run: ls -la apk/
+      - name: Release
+        run: |
+          APK=$(ls apk/*.apk | head -n1)
+          mv "$APK" apk/DY.apk
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ steps.slug.outputs.sha }}
