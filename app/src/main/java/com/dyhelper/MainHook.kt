@@ -33,9 +33,9 @@ class MainHook : IXposedHookLoadPackage {
         HookUtils.log("=== DH v$VERSION $pkg ===")
 
         try {
-            val attachMethod = Application::class.java.getDeclaredMethod("attach", Context::class.java)
-            attachMethod.isAccessible = true
-            XposedBridge.hookMethod(attachMethod, object : XC_MethodHook() {
+            val m = Application::class.java.getDeclaredMethod("attach", Context::class.java)
+            m.isAccessible = true
+            XposedBridge.hookMethod(m, object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     if (inited) return
                     inited = true
@@ -46,12 +46,6 @@ class MainHook : IXposedHookLoadPackage {
             })
         } catch (t: Throwable) {
             HookUtils.log("MainHook err: " + t.message)
-            // Fallback: try init immediately
-            classLoader?.let {
-                val ctx = try { (it.loadClass("android.app.ActivityThread")
-                    .getMethod("currentApplication").invoke(null) as? Context) } catch (_: Exception) { null }
-                if (ctx != null) initAll(ctx)
-            }
         }
     }
 
