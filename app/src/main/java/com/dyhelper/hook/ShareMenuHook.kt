@@ -10,12 +10,10 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.dyhelper.util.ClassFinder
 import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
-import java.lang.Void
 
 class ShareMenuHook(
     private val copyFn: (Context) -> Unit,
@@ -42,35 +40,58 @@ class ShareMenuHook(
         override fun getItemCount(): Int = items.size
     }
 
-    override fun name() = "__分享菜单__"
+    override fun name() = "Menu"
 
     override fun init(loader: ClassLoader): Boolean {
-        val intType = Int::class.javaPrimitiveType
         var ok = false
+        val intType = Int::class.javaPrimitiveType
+        val D = '$'
 
-        // Hook 1: WrapSizeLinearLayout.onMeasure (try known name)
-        val cls1 = ClassFinder.findClass(loader,
-            "com.ss.android.ugc.aweme.sharer.panelmodel.view.WrapSizeLinearLayout")
-        if (cls1 != null && hookOnMeasure(cls1, intType)) {
-            HookUtils.log("[Menu] WrapSizeLinearLayout hooked")
-            ok = true
-        }
-
-        // Hook 2: PanelBuilder inner class
-        val pbClass = "com.ss.android.ugc.aweme.sharer.panelmodel.PanelBuilder${'$'}buildPanel${'$'}1"
-        val cls2 = ClassFinder.findClass(loader, pbClass)
-        if (cls2 != null && hookOnCreateView(cls2)) {
-            HookUtils.log("[Menu] PanelBuilder onCreateView hooked")
-            ok = true
-        }
-
-        // Auto-scan share panel classes if direct lookup failed
-        if (!ok) {
-            val classes = ClassFinder.scanClasses(loader, "com.ss.android.ugc.aweme.sharer")
-            for (cls in classes) {
-                if (hookOnMeasure(cls, intType)) {
-                    HookUtils.log("[Menu] Auto-found share panel: " + cls.name)
+        // Hook 1: WrapSizeLinearLayout.onMeasure
+        val cls1 = XposedHelpers.findClassIfExists(
+            "com.ss.android.ugc.aweme.sharer.panelmodel.view.WrapSizeLinearLayout", loader)
+        if (cls1 != null) {
+            for (m in cls1.declaredMethods) {
+                if (m.name == "onMeasure" && m.parameterTypes.size == 2 &&
+                    m.parameterTypes[0] == intType && m.parameterTypes[1] == intType) {
+                    m.isAccessible = true
+                    XposedBridge.hookMethod(m, object : XC_MethodHook() {
+                        override fun afterHookedMethod(p: MethodHookParam) {
+                            val panel = p.thisObject as? LinearLayout ?: return
+                            if (panel.childCount < 1) return
+                            if (panel.findViewWithTag<View>(888888) != null) return
+                            val sn = panel.getChildAt(0).javaClass.simpleName
+                            if (sn.contains("MeasureOnce") || sn.contains("Linear")) return
+                            addMenu(panel, panel.context)
+                        }
+                    })
+                    HookUtils.log("[Menu] WrapSizeLinearLayout hooked")
                     ok = true
+                    break
+                }
+            }
+        }
+
+        // Hook 2: PanelBuilder$buildPanel$1.onCreateView
+        val pbClass = "com.ss.android.ugc.aweme.sharer.panelmodel.PanelBuilder" + D + "buildPanel" + D + "1"
+        val cls2 = XposedHelpers.findClassIfExists(pbClass, loader)
+        if (cls2 != null) {
+            val ctxClass = Context::class.java
+            val vgClass = ViewGroup::class.java
+            for (m in cls2.declaredMethods) {
+                if (m.name == "onCreateView" && m.parameterTypes.size == 2 &&
+                    m.parameterTypes[0] == ctxClass && m.parameterTypes[1] == vgClass) {
+                    m.isAccessible = true
+                    XposedBridge.hookMethod(m, object : XC_MethodHook() {
+                        override fun afterHookedMethod(p: MethodHookParam) {
+                            val vg = p.result as? ViewGroup ?: return
+                            if (!vg.javaClass.name.contains("common.keyboard.MeasureLinearLayout")) return
+                            addMenu(vg, vg.context)
+                        }
+                    })
+                    HookUtils.log("[Menu] PanelBuilder onCreateView hooked")
+                    ok = true
+                    break
                 }
             }
         }
@@ -78,58 +99,14 @@ class ShareMenuHook(
         return ok
     }
 
-    private fun hookOnMeasure(cls: Class<*>, intType: Class<*>): Boolean {
-        for (m in cls.declaredMethods) {
-            if (m.name == "onMeasure" && m.parameterTypes.size == 2 &&
-                m.parameterTypes[0] == intType &&
-                m.parameterTypes[1] == intType) {
-                m.isAccessible = true
-                XposedBridge.hookMethod(m, object : XC_MethodHook() {
-                    override fun afterHookedMethod(p: MethodHookParam) {
-                        val panel = p.thisObject as? LinearLayout ?: return
-                        if (panel.childCount < 1) return
-                        if (panel.findViewWithTag<View>(888888) != null) return
-                        val sn = panel.getChildAt(0).javaClass.simpleName
-                        if (sn.contains("MeasureOnce") || sn.contains("Linear")) return
-                        addMenu(panel, panel.context)
-                    }
-                })
-                return true
-            }
-        }
-        return false
-    }
-
-    private fun hookOnCreateView(cls: Class<*>): Boolean {
-        val ctxClass = Context::class.java
-        val vgClass = ViewGroup::class.java
-        for (m in cls.declaredMethods) {
-            if (m.name == "onCreateView" &&
-                m.parameterTypes.size == 2 &&
-                m.parameterTypes[0] == ctxClass &&
-                m.parameterTypes[1] == vgClass) {
-                m.isAccessible = true
-                XposedBridge.hookMethod(m, object : XC_MethodHook() {
-                    override fun afterHookedMethod(p: MethodHookParam) {
-                        val vg = p.result as? ViewGroup ?: return
-                        if (!vg.javaClass.name.contains("MeasureLinearLayout")) return
-                        addMenu(vg, vg.context)
-                    }
-                })
-                return true
-            }
-        }
-        return false
-    }
-
     private fun addMenu(container: ViewGroup, ctx: Context) {
         val img = checkImage()
         val items = ArrayList<MI>()
-        items.add(MI("__复制链接__", Runnable { copyFn(ctx) }))
-        items.add(MI(if (img) "__图片下载__" else "__视频下载__", Runnable {
+        items.add(MI("复制链接", Runnable { copyFn(ctx) }))
+        items.add(MI(if (img) "图片下载" else "视频下载", Runnable {
             if (img) imageFn(ctx) else videoFn(ctx)
         }))
-        items.add(MI("__音频下载__", Runnable { audioFn(ctx) }))
+        items.add(MI("音频下载", Runnable { audioFn(ctx) }))
 
         val rv = RecyclerView(ctx)
         rv.layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
