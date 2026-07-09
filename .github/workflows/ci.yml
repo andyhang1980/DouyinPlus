@@ -1,97 +1,57 @@
-name: Build & Release
-
+name: Build and Release
 on:
   workflow_dispatch:
   push:
     branches: [main, master]
   pull_request:
     branches: [main, master]
-
 permissions:
   contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-
       - name: Setup Android SDK
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=${ANDROID_HOME}" >> $GITHUB_ENV
+          echo ANDROID_HOME=${ANDROID_HOME} >> $GITHUB_ENV
+          echo ANDROID_SDK_ROOT=${ANDROID_HOME} >> $GITHUB_ENV
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" 2>/dev/null || true
-
       - name: Download Gradle
         run: |
           wget -q https://services.gradle.org/distributions/gradle-8.7-bin.zip
           unzip -q gradle-8.7-bin.zip
-          echo "$PWD/gradle-8.7/bin" >> $GITHUB_PATH
-
+          echo $PWD/gradle-8.7/bin >> $GITHUB_PATH
       - name: Generate keystore
-        run: |
-          keytool -genkey -v -keystore ${{ github.workspace }}/app/debug.jks -alias debug             -keyalg RSA -keysize 2048 -validity 10000             -storepass android -keypass android -dname "CN=Debug"
-
+        run: keytool -genkey -v -keystore app/debug.jks -alias debug -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname CN=Debug
       - name: Build
         run: |
-          export ANDROID_HOME=${ANDROID_HOME}
-          export ANDROID_SDK_ROOT=${ANDROID_HOME}
-          gradle assembleRelease --no-daemon             -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/debug.jks             -Pandroid.injected.signing.store.password=android             -Pandroid.injected.signing.key.alias=debug             -Pandroid.injected.signing.key.password=android
-
+          gradle assembleRelease --no-daemon -Pandroid.injected.signing.store.file=app/debug.jks -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=debug -Pandroid.injected.signing.key.password=android
       - uses: actions/upload-artifact@v4
         with:
-          name: DouyinPlus-APK
+          name: APK
           path: app/build/outputs/apk/release/*.apk
-
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'pull_request'
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: DouyinPlus-APK
+          name: APK
           path: apk
-
-      - name: Get short SHA
+      - name: Get SHA
         id: slug
-        run: echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
-
-      - name: Rename APK
-        run: |
-          mv apk/app-release.apk "DY++-v3.1.4.apk"
-
+        run: echo sha=$(echo $GITHUB_SHA | cut -c1-7) >> $GITHUB_OUTPUT
+      - name: Rename
+        run: mv apk/app-release.apk apk/DYpp-v3.1.4.apk
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: "build-${{ steps.slug.outputs.sha }}"
-          name: "DY++ v3.1.4"
-          files: apk/*.apk
-          prerelease: true
-          body: |
-            ## 闁硅埖鐗犻悡鍓佷焊韫囨艾鍘撮�?v3.1.4
-
-            闂侇偄鍊块崢銈夊箮閺嶎厾�?39.5 闁绘鐗婂﹢?
-
-            ### 闁告梻鍠曢崗?
-            - 濠㈣泛绉撮崺妤呮煣閻愵剙�?
-            - 閻熸瑥妫濋�?闁搞儱澧芥晶鏍ㄧ▔鐎ｎ厽绁伴柨娑樼墛濡倕顫濋弶鎴濈オ闁?
-            - 闂傚﹥濞婇。鑸电▔鐎ｎ厽绁?
-            - 闁告顕х粻宥夊川婵犲繒绀勯柤濂変簻婵晠鏌呴崒鐐插赋�?
-            - 閻犲搫鐤囩换鍐嚕閳ь剛浠﹁箛鎾剁暛闁?
-
-            ### 閻庣懓顦抽ˉ濠囧棘鐟欏嫮銆?
-            1. 閻庣懓顦抽�?LSPosed 婵℃妫欓悘?
-            2. 閻庣懓顦抽ˉ濠囧嫉?APK
-            3. �?LSPosed 濞戞搩鍘奸幆搴ㄦ偨閵娢翠線宕稿Δ鈧懟鐔煎礋妤ｅ啠鍋撴径瀣潔闂?
-            4. 闂佹彃绉撮幆搴ㄥ箮閺嶎厾�?
-
-            ### 婵炲鍔嶉崜鐗堢鐎ｎ喓�?
-            闁瑰灚鎸哥槐鎴﹀箮閺嶎厾鍙鹃柛姘凹缁变即寮伴崜褋浠?Toast 闁圭粯鍔楅妵姘舵焻閸岀偛甯抽柣妯垮煐閳ь兛闄嶉埀顒€鍊界€氥垽寮婚幇顒戒線宕稿Δ浣瑰紦闂侇偄鍊块崢銈夊箣閹邦剙顫犻柨娑樼焷椤曨剟宕ｅ澶樻疮闁?
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: build-${{ steps.slug.outputs.sha }}
+          name: DY++ v3.1.4
+          files: apk/DYpp-v3.1.4.apk
