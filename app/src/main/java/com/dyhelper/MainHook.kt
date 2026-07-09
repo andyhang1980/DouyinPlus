@@ -13,15 +13,15 @@ import com.dyhelper.hook.DownloadHook
 import com.dyhelper.hook.ShareMenuHook
 import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.IXposedHookLoadPackage
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 class MainHook : IXposedHookLoadPackage {
 
     companion object {
         var classLoader: ClassLoader? = null
+        var appContext: Context? = null
         private var inited = false
-        const val VERSION = "3.1.3-dy395"
+        const val VERSION = "3.1.4-dy395"
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -31,69 +31,54 @@ class MainHook : IXposedHookLoadPackage {
         classLoader = lpparam.classLoader
         HookUtils.log("=== DH v$VERSION $pkg ===")
 
+        // Diagnostic dump
+        HookUtils.dumpBridgeMethods()
+
         try {
-            // Use hookAllMethods (LSPosed-safe) instead of hookMethod(Member, ...)
-            HookUtils.hookOneMethod(Application::class.java, "attach", object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
+            // Hook Application.attach via reflection helper
+            val ok = HookUtils.hookViaReflection(Application::class.java, "attach", object : HookUtils.RB() {
+                override fun after(obj: Any, args: Array<out Any?>, result: Any?) {
                     if (inited) return
                     inited = true
-                    val ctx = param.args[0] as Context
+                    val ctx = args[0] as Context
+                    appContext = ctx
                     classLoader = ctx.classLoader
                     initAll(ctx)
                 }
             })
-            HookUtils.log("Application.attach hook OK")
+            HookUtils.log("attach hook: $ok")
         } catch (t: Throwable) {
             HookUtils.log("MainHook err: " + t.message)
         }
     }
 
     private fun initAll(ctx: Context) {
-        val loader = classLoader ?: run {
-            HookUtils.log("initAll: no classLoader!")
-            return
-        }
-        HookUtils.log("initAll: loader=" + loader.javaClass.name)
+        val loader = classLoader ?: run { HookUtils.log("no classLoader"); return }
+        HookUtils.log("initAll: " + loader.javaClass.name)
 
         val cap = DataCaptureHook()
         val dl = DownloadHook(cap)
-
         val hooks = listOf<BaseHook>(
-            ShareMenuHook(
-                copyFn = { c -> dl.copyLink(c) },
-                videoFn = { c -> dl.video(c) },
-                audioFn = { c -> dl.audio(c) },
-                imageFn = { c -> dl.image(c) },
-                checkImage = { cap.isImage() }
-            ),
-            cap,
-            AntiAdHook()
+            ShareMenuHook(copyFn = { c -> dl.copyLink(c) }, videoFn = { c -> dl.video(c) },
+                audioFn = { c -> dl.audio(c) }, imageFn = { c -> dl.image(c) },
+                checkImage = { cap.isImage() }),
+            cap, AntiAdHook()
         )
 
         var ok = 0
         var names = ""
         for (h in hooks) {
             try {
-                if (h.init(loader)) {
-                    ok++
-                    if (names.isNotEmpty()) names += " "
-                    names += h.name()
-                }
-            } catch (t: Throwable) {
-                HookUtils.log(h.name() + " err: " + t.message)
-            }
+                if (h.init(loader)) { ok++; if (names.isNotEmpty()) names += " "; names += h.name() }
+            } catch (t: Throwable) { HookUtils.log(h.name() + " err: " + t.message) }
         }
-
         val total = hooks.size
-        val msg = if (ok == total) "\u81EA\u52A8\u9002\u914D\u5B8C\u6210 $ok/$total $names"
-                  else "\u81EA\u52A8\u9002\u914D: $ok/$total $names"
-
+        val msg = if (ok == total) "\u81EA\u52A8\u9002\u914D\u5B8C\u6210 $ok/$total $names" else "\u81EA\u52A8\u9002\u914D: $ok/$total $names"
         Handler(Looper.getMainLooper()).postDelayed({
-            val t = Toast.makeText(ctx, msg, Toast.LENGTH_LONG)
-            t.setGravity(Gravity.CENTER_HORIZONTAL or Gravity.TOP, 0, 200)
-            t.show()
+            Toast.makeText(ctx, msg, Toast.LENGTH_LONG).apply {
+                setGravity(Gravity.CENTER_HORIZONTAL or Gravity.TOP, 0, 200); show()
+            }
         }, 2000)
-
         HookUtils.log("=== $ok/$total : $names ===")
     }
 }

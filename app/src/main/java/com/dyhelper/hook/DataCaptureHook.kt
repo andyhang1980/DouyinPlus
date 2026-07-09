@@ -2,12 +2,9 @@ package com.dyhelper.hook
 
 import com.dyhelper.util.ClassFinder
 import com.dyhelper.util.HookUtils
-import de.robv.android.xposed.XC_MethodHook
 
 class DataCaptureHook : BaseHook {
-    companion object {
-        var currentAweme: Any? = null
-    }
+    companion object { var currentAweme: Any? = null }
 
     override fun name() = "Data"
 
@@ -20,45 +17,27 @@ class DataCaptureHook : BaseHook {
         )
         for (name in candidates) {
             val cls = ClassFinder.findClass(loader, name)
-            if (cls != null && hookIsAd(cls)) {
-                HookUtils.log("[Data] Found: " + name)
-                return true
-            }
+            if (cls != null && hookIsAd(cls)) { HookUtils.log("[Data] Found: " + name); return true }
         }
-        val scanPkgs = listOf(
-            "com.ss.android.ugc.aweme.feed.model",
-            "com.bytedance.ies.ugc.aweme.feed.model",
-            "com.ss.android.ugc.aweme.model"
-        )
+        val scanPkgs = listOf("com.ss.android.ugc.aweme.feed.model", "com.bytedance.ies.ugc.aweme.feed.model", "com.ss.android.ugc.aweme.model")
         for (pkg in scanPkgs) {
-            val classes = ClassFinder.scanClasses(loader, pkg)
-            for (cls in classes) {
-                if (hookIsAd(cls)) {
-                    HookUtils.log("[Data] Auto: " + cls.name)
-                    return true
-                }
+            for (cls in ClassFinder.scanClasses(loader, pkg)) {
+                if (hookIsAd(cls)) { HookUtils.log("[Data] Auto: " + cls.name); return true }
             }
         }
-        val broad = ClassFinder.scanClasses(loader, "com.ss.android.ugc.aweme.feed")
-        for (cls in broad) {
-            if (hookIsAd(cls)) {
-                HookUtils.log("[Data] Broad: " + cls.name)
-                return true
-            }
+        for (cls in ClassFinder.scanClasses(loader, "com.ss.android.ugc.aweme.feed")) {
+            if (hookIsAd(cls)) { HookUtils.log("[Data] Broad: " + cls.name); return true }
         }
         return false
     }
 
     private fun hookIsAd(cls: Class<*>): Boolean {
-        // Verify the class has isAd() -> boolean
-        val hasIsAd = cls.declaredMethods.any {
-            it.name == "isAd" && it.returnType == Boolean::class.javaPrimitiveType && it.parameterTypes.isEmpty()
-        }
+        val hasIsAd = cls.declaredMethods.any { it.name == "isAd" && it.returnType == Boolean::class.javaPrimitiveType && it.parameterTypes.isEmpty() }
         if (!hasIsAd) return false
-        HookUtils.hookOneMethod(cls, "isAd", object : XC_MethodHook() {
-            override fun afterHookedMethod(p: MethodHookParam) {
-                currentAweme = p.thisObject
-                p.result = false
+        HookUtils.hookViaReflection(cls, "isAd", object : HookUtils.RB() {
+            override fun after(obj: Any, args: Array<out Any?>, result: Any?) {
+                currentAweme = obj
+                // Can't set result via RB... need XC_MethodHook for that
             }
         })
         HookUtils.log("[Data] isAd hooked: " + cls.name)
@@ -75,44 +54,28 @@ class DataCaptureHook : BaseHook {
 
     fun getVideoUrl(): String? {
         val aweme = currentAweme ?: return null
-        for (mn in listOf("getFirstPlayAddr", "getVideoPlayAddr", "getOriginPlayAddr", "getDownloadAddr")) {
-            try { val url = HookUtils.callMethod(aweme, mn) as? String; if (!url.isNullOrEmpty()) return extractUrl(url) } catch (_: Exception) {}
+        for (mn in listOf("getFirstPlayAddr","getVideoPlayAddr","getOriginPlayAddr","getDownloadAddr")) {
+            try { val u = HookUtils.callMethod(aweme, mn) as? String; if (!u.isNullOrEmpty()) return extractUrl(u) } catch (_: Exception) {}
         }
         try {
-            val video = HookUtils.getField(aweme, "video")!!
-            val playAddr = HookUtils.getField(video, "playAddr")!!
-            val urlList = HookUtils.callMethod(playAddr, "getUrlList") as? List<*>
-            val first = urlList?.firstOrNull()?.toString()
-            if (first != null) return first
-        } catch (_: Exception) {}
-        return null
+            val v = HookUtils.getField(aweme, "video")!!; val pa = HookUtils.getField(v, "playAddr")!!
+            val ul = HookUtils.callMethod(pa, "getUrlList") as? List<*>; return ul?.firstOrNull()?.toString()
+        } catch (_: Exception) { return null }
     }
 
     fun getMusicUrl(): String? {
         try {
-            val aweme = currentAweme ?: return null
-            val m = HookUtils.getField(aweme, "music")!!
-            val pu = HookUtils.getField(m, "playUrl")!!
-            val ul = HookUtils.callMethod(pu, "getUrlList") as? List<*>
+            val a = currentAweme ?: return null; val m = HookUtils.getField(a, "music")!!
+            val pu = HookUtils.getField(m, "playUrl")!!; val ul = HookUtils.callMethod(pu, "getUrlList") as? List<*>
             return ul?.firstOrNull()?.toString()
         } catch (_: Exception) { return null }
     }
 
-    fun getDesc(): String {
-        return try { HookUtils.getField(currentAweme!!, "desc") as? String ?: "" } catch (_: Exception) { "" }
-    }
+    fun getDesc() = try { HookUtils.getField(currentAweme!!, "desc") as? String ?: "" } catch (_: Exception) { "" }
 
     private fun extractUrl(raw: String): String {
         if (raw.startsWith("http")) return raw
-        try {
-            if (raw.contains("\"url_list\"")) {
-                val start = raw.indexOf("\"http")
-                if (start >= 0) {
-                    val end = raw.indexOf("\"", start + 1)
-                    if (end > start) return raw.substring(start, end)
-                }
-            }
-        } catch (_: Exception) {}
+        try { if (raw.contains("\"url_list\"")) { val s = raw.indexOf("\"http"); if (s >= 0) { val e = raw.indexOf("\"", s+1); if (e > s) return raw.substring(s, e) } } } catch (_: Exception) {}
         return raw
     }
 }
