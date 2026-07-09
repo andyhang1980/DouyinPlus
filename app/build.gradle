@@ -29,12 +29,6 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
-    applicationVariants.all { variant ->
-        variant.outputs.all {
-            outputFileName = "抖音小能手-v${variant.versionName}.apk"
-        }
-    }
 }
 
 dependencies {
@@ -42,4 +36,3 @@ dependencies {
     implementation "androidx.core:core-ktx:1.12.0"
     implementation "androidx.recyclerview:recyclerview:1.3.2"
 }
-

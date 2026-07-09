@@ -1,4 +1,4 @@
-name: Build & Release
+﻿name: Build & Release
 
 on:
   workflow_dispatch:
@@ -63,25 +63,35 @@ jobs:
         id: slug
         run: echo "sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
+      - name: Rename APK
+        run: |
+          mv apk/app-release.apk "apk/抖音小能手-v3.1.0.apk"
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: "build-${{ steps.slug.outputs.sha }}"
-          name: "Build ${{ steps.slug.outputs.sha }} (DouyinHelper)"
+          name: "抖音小能手 v3.1.0"
           files: apk/*.apk
           prerelease: true
           body: |
-            ## DouyinHelper v1.1
+            ## 抖音小能手 v3.1.0
 
-            * No ads
-            * Download videos without watermark
-            * Download audio
-            * Copy link
-            * Adaptive hooks (auto-discover target classes)
+            适配抖音 39.5 版本
 
-            ### Install
-            1. Install LSPosed framework
-            2. Install this APK
-            3. Enable module in LSPosed and select Douyin
-            4. Restart Douyin
+            ### 功能
+            - 复制链接
+            - 视频/图片下载（无水印）
+            - 音频下载
+            - 去广告（自动适配）
+            - 跳过开屏广告
+
+            ### 安装方法
+            1. 安装 LSPosed 框架
+            2. 安装本 APK
+            3. 在 LSPosed 中启用模块并勾选抖音
+            4. 重启抖音
+
+            ### 注意事项
+            打开抖音后会显示 Toast 提示适配状态。若某模块未适配成功，请反馈。
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
