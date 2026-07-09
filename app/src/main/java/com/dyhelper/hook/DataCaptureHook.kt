@@ -94,8 +94,8 @@ class DataCaptureHook : BaseHook {
             } catch (_: Exception) {}
         }
         try {
-            val video = HookUtils.getField(aweme, "video")
-            val playAddr = HookUtils.getField(video, "playAddr")
+            val video = HookUtils.getField(aweme, "video")!!
+            val playAddr = HookUtils.getField(video, "playAddr")!!
             val urlList = HookUtils.callMethod(playAddr, "getUrlList") as? List<*>
             val first = urlList?.firstOrNull()?.toString()
             if (first != null) return first
@@ -106,8 +106,8 @@ class DataCaptureHook : BaseHook {
     fun getMusicUrl(): String? {
         try {
             val aweme = currentAweme ?: return null
-            val m = HookUtils.getField(aweme, "music")
-            val pu = HookUtils.getField(m, "playUrl")
+            val m = HookUtils.getField(aweme, "music")!!
+            val pu = HookUtils.getField(m, "playUrl")!!
             val ul = HookUtils.callMethod(pu, "getUrlList") as? List<*>
             return ul?.firstOrNull()?.toString()
         } catch (_: Exception) { return null }
