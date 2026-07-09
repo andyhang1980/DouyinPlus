@@ -28,10 +28,10 @@ jobs:
           unzip -q gradle-8.7-bin.zip
           echo $PWD/gradle-8.7/bin >> $GITHUB_PATH
       - name: Generate keystore
-        run: keytool -genkey -v -keystore app/debug.jks -alias debug -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname CN=Debug
+        run: keytool -genkey -v -keystore ${{ github.workspace }}/app/debug.jks -alias debug -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname CN=Debug
       - name: Build
         run: |
-          gradle assembleRelease --no-daemon -Pandroid.injected.signing.store.file=app/debug.jks -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=debug -Pandroid.injected.signing.key.password=android
+          gradle assembleRelease --no-daemon -Pandroid.injected.signing.store.file=${{ github.workspace }}/app/debug.jks -Pandroid.injected.signing.store.password=android -Pandroid.injected.signing.key.alias=debug -Pandroid.injected.signing.key.password=android
       - uses: actions/upload-artifact@v4
         with:
           name: APK
