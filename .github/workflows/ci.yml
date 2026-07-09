@@ -49,9 +49,9 @@ jobs:
         id: slug
         run: echo sha=$(echo $GITHUB_SHA | cut -c1-7) >> $GITHUB_OUTPUT
       - name: Rename
-        run: mv apk/app-release.apk apk/DYpp-v3.1.4.apk
+        run: mv apk/app-release.apk apk/DYpp-v3.1.5.apk
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ steps.slug.outputs.sha }}
-          name: DY++ v3.1.4
-          files: apk/DYpp-v3.1.4.apk
+          name: DY++ v3.1.5
+          files: apk/DYpp-v3.1.5.apk
