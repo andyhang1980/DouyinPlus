@@ -8,7 +8,6 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -26,75 +25,54 @@ class ShareMenuHook(
 
     data class MI(val label: String, val action: Runnable)
 
-    class MA(private val items: List<MI>) : RecyclerView.Adapter<MA.VH>() {
+    class MA(items: List<MI>) : RecyclerView.Adapter<MA.VH>() {
+        private val data = items.toList()
         class VH(view: TextView) : RecyclerView.ViewHolder(view)
         override fun onCreateViewHolder(p: ViewGroup, vt: Int): VH {
-            val tv = TextView(p.context)
-            tv.textSize = 12f
-            tv.setTextColor(Color.parseColor("#CCCCCC"))
-            tv.gravity = Gravity.CENTER
-            tv.setPadding(20, 12, 20, 12)
+            val tv = TextView(p.context).apply {
+                textSize = 12f; setTextColor(Color.parseColor("#CCCCCC"))
+                gravity = Gravity.CENTER; setPadding(20, 12, 20, 12)
+            }
             return VH(tv)
         }
         override fun onBindViewHolder(vh: VH, pos: Int) {
-            (vh.itemView as TextView).text = items[pos].label
-            vh.itemView.setOnClickListener { items[pos].action.run() }
+            (vh.itemView as TextView).text = data[pos].label
+            vh.itemView.setOnClickListener { data[pos].action.run() }
         }
-        override fun getItemCount(): Int = items.size
+        override fun getItemCount() = data.size
     }
 
     override fun name() = "Menu"
 
-    private fun addMenu(container: ViewGroup, ctx: Context) {
+    private fun injectMenu(parent: ViewGroup, ctx: Context) {
+        if (parent.findViewWithTag<View>(888888) != null) return
         val img = checkImage()
-        val items = ArrayList<MI>()
-        items.add(MI("u590Du5236u94FEu63A5", Runnable { copyFn(ctx) }))
-        items.add(MI(if (img) "u56FEu7247u4E0Bu8F7D" else "u89C6u9891u4E0Bu8F7D", Runnable {
-            if (img) imageFn(ctx) else videoFn(ctx)
-        }))
-        items.add(MI("u97F3u9891u4E0Bu8F7D", Runnable { audioFn(ctx) }))
-
-        val rv = RecyclerView(ctx)
-        rv.layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
-        rv.setPadding(13, 0, 13, 0)
-        rv.adapter = MA(items)
-        rv.tag = 888888
-        container.addView(rv)
-
-        val pb = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal)
-        pb.max = 100
-        pb.visibility = View.GONE
-        container.addView(pb)
-    }
-
-    private fun collectRVs(view: View): List<RecyclerView> {
-        val result = mutableListOf<RecyclerView>()
-        if (view is RecyclerView) {
-            result.add(view)
-        } else if (view is ViewGroup) {
-            for (i in 0 until view.childCount) {
-                result.addAll(collectRVs(view.getChildAt(i)))
-            }
+        val items = listOf(
+            MI("u590Du5236u94FEu63A5", Runnable { copyFn(ctx) }),
+            MI(if (img) "u56FEu7247u4E0Bu8F7D" else "u89C6u9891u4E0Bu8F7D", Runnable {
+                if (img) imageFn(ctx) else videoFn(ctx)
+            }),
+            MI("u97F3u9891u4E0Bu8F7D", Runnable { audioFn(ctx) })
+        )
+        val rv = RecyclerView(ctx).apply {
+            layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
+            adapter = MA(items)
+            tag = 888888
+            setPadding(13, 0, 13, 0)
         }
-        return result
+        parent.addView(rv, 0)
+        HookUtils.log("[Menu] Injected into " + parent.javaClass.simpleName)
     }
 
-    private fun tryInject(decor: View, source: String): Boolean {
-        val rvs = collectRVs(decor)
-        for (rv in rvs) {
-            val lm = rv.layoutManager as? LinearLayoutManager ?: continue
-            if (lm.orientation != LinearLayoutManager.HORIZONTAL) continue
-            val ad = rv.adapter ?: continue
-            if (ad.itemCount < 2 || ad.itemCount > 30) continue
-            val adName = ad.javaClass.name.lowercase()
-            if (!adName.contains("share") && !adName.contains("presenter") &&
-                !adName.contains("model") && !source.lowercase().contains("share") &&
-                !source.lowercase().contains("panel") && !source.lowercase().contains("bottom")) continue
-            val parent = rv.parent as? ViewGroup ?: continue
-            if (parent.findViewWithTag<View>(888888) != null) continue
-            HookUtils.log("[Menu] Injected into: " + source + " / " + adName)
-            addMenu(parent, rv.context)
+    private fun findAndInject(root: View): Boolean {
+        if (root is ViewGroup && root.javaClass.name.contains("ActionBar")) {
+            injectMenu(root, root.context)
             return true
+        }
+        if (root is ViewGroup) {
+            for (i in 0 until root.childCount) {
+                if (findAndInject(root.getChildAt(i))) return true
+            }
         }
         return false
     }
@@ -102,46 +80,84 @@ class ShareMenuHook(
     override fun init(loader: ClassLoader): Boolean {
         var ok = false
 
-        // Strategy 1: Hook RecyclerView.setAdapter
+        // === Primary: Hook Dialog.show, filter for share panels ===
         try {
-            val rvClass = RecyclerView::class.java
-            for (m in rvClass.declaredMethods) {
-                if (m.name == "setAdapter" && m.parameterTypes.size == 1) {
-                    m.isAccessible = true
-                    XposedBridge.hookMethod(m, object : XC_MethodHook() {
-                        override fun afterHookedMethod(p: MethodHookParam) {
-                            val rv = p.thisObject as RecyclerView
-                            tryInject(rv, "RV")
-                        }
-                    })
-                    HookUtils.log("[Menu] RV hook installed")
-                    ok = true
-                    break
-                }
-            }
-        } catch (t: Throwable) {
-            HookUtils.log("[Menu] RV hook err: " + t.message)
-        }
-
-        // Strategy 2: Hook Dialog.show
-        try {
-            val showMethod = Dialog::class.java.getDeclaredMethod("show")
-            showMethod.isAccessible = true
-            XposedBridge.hookMethod(showMethod, object : XC_MethodHook() {
+            val m = Dialog::class.java.getDeclaredMethod("show")
+            m.isAccessible = true
+            XposedBridge.hookMethod(m, object : XC_MethodHook() {
                 override fun afterHookedMethod(p: MethodHookParam) {
-                    val dialog = p.thisObject as Dialog
-                    val w = dialog.window ?: return
-                    val decor = w.decorView ?: return
-                    val handler = Handler(Looper.getMainLooper())
-                    handler.postDelayed({
-                        tryInject(decor, dialog.javaClass.name)
+                    val dlgClass = p.thisObject.javaClass.name.lowercase()
+                    if (!dlgClass.contains("social") && !dlgClass.contains("share")) return
+                    HookUtils.log("[Menu] Dialog.show: " + dlgClass)
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        try {
+                            val w = (p.thisObject as Dialog).window ?: return@postDelayed
+                            val d = w.decorView ?: return@postDelayed
+                            findAndInject(d)
+                        } catch (t: Throwable) {
+                            HookUtils.log("[Menu] inject err: " + t.message)
+                        }
                     }, 500)
                 }
             })
-            HookUtils.log("[Menu] Dialog hook installed")
+            HookUtils.log("[Menu] Dialog hook OK")
             ok = true
         } catch (t: Throwable) {
             HookUtils.log("[Menu] Dialog hook err: " + t.message)
+        }
+
+        // === Strategy 2: Hook known share panel class methods ===
+        val targets = listOf(
+            "com.ss.android.ugc.aweme.share.socialpanel.dialog.SocialActionsPanel"
+        )
+        for (cn in targets) {
+            val cls = HookUtils.findClass(loader, cn) ?: continue
+            HookUtils.log("[Menu] Found class: " + cn)
+            // Try to hook constructor
+            for (ctor in cls.declaredConstructors) {
+                if (ctor.parameterTypes.size !in 1..5) continue
+                ctor.isAccessible = true
+                XposedBridge.hookMethod(ctor, object : XC_MethodHook() {
+                    override fun afterHookedMethod(p: MethodHookParam) {
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            try {
+                                val dlg = p.thisObject as? Dialog ?: return@postDelayed
+                                val w = dlg.window ?: return@postDelayed
+                                findAndInject(w.decorView ?: return@postDelayed)
+                            } catch (_: Exception) {}
+                        }, 600)
+                    }
+                })
+                HookUtils.log("[Menu] Ctor hook: " + cn)
+                ok = true
+                break
+            }
+        }
+
+        // === Strategy 3: RV setAdapter fallback for SocialActionsPanelRecyclerView ===
+        try {
+            val rvC = RecyclerView::class.java
+            for (mtd in rvC.declaredMethods) {
+                if (mtd.name != "setAdapter" || mtd.parameterTypes.size != 1) continue
+                mtd.isAccessible = true
+                XposedBridge.hookMethod(mtd, object : XC_MethodHook() {
+                    override fun afterHookedMethod(p: MethodHookParam) {
+                        val rv = p.thisObject
+                        if (!rv.javaClass.name.contains("SocialActions")) return
+                        HookUtils.log("[Menu] SocialActions RV adapter set, parent=" +
+                            ((rv as View).parent as? ViewGroup)?.javaClass?.simpleName)
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            val parent = (rv as View).parent as? ViewGroup ?: return@postDelayed
+                            injectMenu(parent, rv.context)
+                        }, 300)
+                    }
+                })
+                HookUtils.log("[Menu] SocialActions RV hook OK")
+                if (!ok) ok = true
+                break
+            }
+        } catch (t: Throwable) {
+            HookUtils.log("[Menu] RV hook err: " + t.message)
         }
 
         return ok

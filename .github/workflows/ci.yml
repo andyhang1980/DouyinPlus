@@ -65,33 +65,33 @@ jobs:
 
       - name: Rename APK
         run: |
-          mv apk/app-release.apk "apk/抖音小能手-v3.1.1.apk"
+          mv apk/app-release.apk "apk/鎶栭煶灏忚兘鎵?v3.1.2.apk"
 
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: "build-${{ steps.slug.outputs.sha }}"
-          name: "抖音小能手 v3.1.1"
+          name: "鎶栭煶灏忚兘鎵?v3.1.2"
           files: apk/*.apk
           prerelease: true
           body: |
-            ## 抖音小能手 v3.1.1
+            ## 鎶栭煶灏忚兘鎵?v3.1.2
 
-            适配抖音 39.5 版本
+            閫傞厤鎶栭煶 39.5 鐗堟湰
 
-            ### 功能
-            - 复制链接
-            - 视频/图片下载（无水印）
-            - 音频下载
-            - 去广告（自动适配）
-            - 跳过开屏广告
+            ### 鍔熻兘
+            - 澶嶅埗閾炬帴
+            - 瑙嗛/鍥剧墖涓嬭浇锛堟棤姘村嵃锛?
+            - 闊抽涓嬭浇
+            - 鍘诲箍鍛婏紙鑷姩閫傞厤锛?
+            - 璺宠繃寮€灞忓箍鍛?
 
-            ### 安装方法
-            1. 安装 LSPosed 框架
-            2. 安装本 APK
-            3. 在 LSPosed 中启用模块并勾选抖音
-            4. 重启抖音
+            ### 瀹夎鏂规硶
+            1. 瀹夎 LSPosed 妗嗘灦
+            2. 瀹夎鏈?APK
+            3. 鍦?LSPosed 涓惎鐢ㄦā鍧楀苟鍕鹃€夋姈闊?
+            4. 閲嶅惎鎶栭煶
 
-            ### 注意事项
-            打开抖音后会显示 Toast 提示适配状态。若某模块未适配成功，请反馈。
+            ### 娉ㄦ剰浜嬮」
+            鎵撳紑鎶栭煶鍚庝細鏄剧ず Toast 鎻愮ず閫傞厤鐘舵€併€傝嫢鏌愭ā鍧楁湭閫傞厤鎴愬姛锛岃鍙嶉銆?
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
