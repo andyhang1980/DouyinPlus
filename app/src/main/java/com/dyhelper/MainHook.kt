@@ -14,7 +14,7 @@ import com.dyhelper.hook.ShareMenuHook
 import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedHelpers
+import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 class MainHook : IXposedHookLoadPackage {
@@ -32,9 +32,10 @@ class MainHook : IXposedHookLoadPackage {
         classLoader = lpparam.classLoader
         HookUtils.log("=== DH v$VERSION $pkg ===")
 
-        XposedHelpers.findAndHookMethod(
-            Application::class.java, "attach", Context::class.java,
-            object : XC_MethodHook() {
+        try {
+            val attachMethod = Application::class.java.getDeclaredMethod("attach", Context::class.java)
+            attachMethod.isAccessible = true
+            XposedBridge.hookMethod(attachMethod, object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     if (inited) return
                     inited = true
@@ -43,6 +44,15 @@ class MainHook : IXposedHookLoadPackage {
                     initAll(ctx)
                 }
             })
+        } catch (t: Throwable) {
+            HookUtils.log("MainHook err: " + t.message)
+            // Fallback: try init immediately
+            classLoader?.let {
+                val ctx = try { (it.loadClass("android.app.ActivityThread")
+                    .getMethod("currentApplication").invoke(null) as? Context) } catch (_: Exception) { null }
+                if (ctx != null) initAll(ctx)
+            }
+        }
     }
 
     private fun initAll(ctx: Context) {

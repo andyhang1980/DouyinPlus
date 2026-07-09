@@ -8,16 +8,13 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.dyhelper.util.ClassFinder
 import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
 
 class ShareMenuHook(
     private val copyFn: (Context) -> Unit,
@@ -105,38 +102,42 @@ class ShareMenuHook(
     override fun init(loader: ClassLoader): Boolean {
         var ok = false
 
-        // Strategy 1: Hook RecyclerView.setAdapter (detects share panel RecyclerViews)
+        // Strategy 1: Hook RecyclerView.setAdapter
         try {
-            XposedHelpers.findAndHookMethod(
-                RecyclerView::class.java, "setAdapter",
-                RecyclerView.Adapter::class.java,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(p: MethodHookParam) {
-                        val rv = p.thisObject as RecyclerView
-                        tryInject(rv, "RV")
-                    }
-                })
-            HookUtils.log("[Menu] RV hook installed")
-            ok = true
+            val rvClass = RecyclerView::class.java
+            for (m in rvClass.declaredMethods) {
+                if (m.name == "setAdapter" && m.parameterTypes.size == 1) {
+                    m.isAccessible = true
+                    XposedBridge.hookMethod(m, object : XC_MethodHook() {
+                        override fun afterHookedMethod(p: MethodHookParam) {
+                            val rv = p.thisObject as RecyclerView
+                            tryInject(rv, "RV")
+                        }
+                    })
+                    HookUtils.log("[Menu] RV hook installed")
+                    ok = true
+                    break
+                }
+            }
         } catch (t: Throwable) {
             HookUtils.log("[Menu] RV hook err: " + t.message)
         }
 
-        // Strategy 2: Hook Dialog.show (catches share bottom sheets)
+        // Strategy 2: Hook Dialog.show
         try {
-            XposedHelpers.findAndHookMethod(
-                Dialog::class.java, "show",
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(p: MethodHookParam) {
-                        val dialog = p.thisObject as Dialog
-                        val w = dialog.window ?: return
-                        val decor = w.decorView ?: return
-                        val handler = Handler(Looper.getMainLooper())
-                        handler.postDelayed({
-                            tryInject(decor, dialog.javaClass.name)
-                        }, 500)
-                    }
-                })
+            val showMethod = Dialog::class.java.getDeclaredMethod("show")
+            showMethod.isAccessible = true
+            XposedBridge.hookMethod(showMethod, object : XC_MethodHook() {
+                override fun afterHookedMethod(p: MethodHookParam) {
+                    val dialog = p.thisObject as Dialog
+                    val w = dialog.window ?: return
+                    val decor = w.decorView ?: return
+                    val handler = Handler(Looper.getMainLooper())
+                    handler.postDelayed({
+                        tryInject(decor, dialog.javaClass.name)
+                    }, 500)
+                }
+            })
             HookUtils.log("[Menu] Dialog hook installed")
             ok = true
         } catch (t: Throwable) {
