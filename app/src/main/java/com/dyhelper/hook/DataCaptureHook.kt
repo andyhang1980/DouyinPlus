@@ -1,32 +1,37 @@
-package com.dyhelper.hook
+﻿package com.dyhelper.hook
 
 import com.dyhelper.util.ClassFinder
 import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 
 class DataCaptureHook : BaseHook {
     companion object { var currentAweme: Any? = null }
     override fun name() = "Data"
 
     override fun init(loader: ClassLoader): Boolean {
-        val candidates = listOf("com.ss.android.ugc.aweme.feed.model.Aweme","com.ss.android.ugc.aweme.feed.model.AwemeBase","com.ss.android.ugc.aweme.feed.model.BaseFeedItem","com.bytedance.ies.ugc.aweme.feed.model.Aweme")
-        for (name in candidates) { val cls = ClassFinder.findClass(loader, name); if (cls != null && hookIsAd(cls)) { HookUtils.log("[Data] Found: " + name); return true } }
-        for (pkg in listOf("com.ss.android.ugc.aweme.feed.model","com.bytedance.ies.ugc.aweme.feed.model","com.ss.android.ugc.aweme.model")) { for (cls in ClassFinder.scanClasses(loader, pkg)) { if (hookIsAd(cls)) { HookUtils.log("[Data] Auto: " + cls.name); return true } } }
-        for (cls in ClassFinder.scanClasses(loader, "com.ss.android.ugc.aweme.feed")) { if (hookIsAd(cls)) { HookUtils.log("[Data] Broad: " + cls.name); return true } }
+        val candidates = listOf("com.ss.android.ugc.aweme.feed.model.Aweme","com.ss.ugc.aweme.Aweme")
+        for (name in candidates) {
+            val cls = ClassFinder.findClass(loader, name)
+            if (cls != null && hookIsAd(cls)) { HookUtils.log("[Data] Found: " + name); return true }
+        }
+        for (pkg in listOf("com.ss.android.ugc.aweme.feed.model","com.bytedance.ies.ugc.aweme.feed.model")) {
+            for (cls in ClassFinder.scanClasses(loader, pkg)) {
+                if (hookIsAd(cls)) { HookUtils.log("[Data] Auto: " + cls.name); return true }
+            }
+        }
         return false
     }
 
     private fun hookIsAd(cls: Class<*>): Boolean {
         for (m in cls.declaredMethods) {
             if (m.name == "isAd" && m.returnType == Boolean::class.javaPrimitiveType && m.parameterTypes.isEmpty()) {
-                m.isAccessible = true
-                try {
-                    XposedBridge.hookMethod(m, object : XC_MethodHook() {
-                        override fun afterHookedMethod(p: MethodHookParam) { currentAweme = p.thisObject; p.result = false }
-                    })
-                    HookUtils.log("[Data] isAd hooked: " + cls.name); return true
-                } catch (t: Throwable) { HookUtils.log("[Data] hook err: " + t.message) }
+                if (HookUtils.hookAllMethods(cls, "isAd", object : XC_MethodHook() {
+                    override fun afterHookedMethod(p: MethodHookParam) { currentAweme = p.thisObject; p.result = false }
+                })) {
+                    HookUtils.log("[Data] isAd hooked via hookAllMethods: " + cls.name); return true
+                } else {
+                    HookUtils.log("[Data] isAd hookAllMethods failed: " + cls.name)
+                }
             }
         }
         return false
