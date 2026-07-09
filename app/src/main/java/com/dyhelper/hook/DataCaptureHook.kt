@@ -12,67 +12,54 @@ class DataCaptureHook : BaseHook {
 
     override fun name() = "Data"
     override fun init(loader: ClassLoader): Boolean {
-        return hookOne(loader, "Aweme",
-            "com.ss.android.ugc.aweme.feed.model.Aweme",
-            Boolean::class.javaPrimitiveType, "isAd",
+        return h(loader, "Aweme", "com.ss.android.ugc.aweme.feed.model.Aweme",
+            Boolean::class.javaPrimitiveType, "isAd", emptyArray(),
             object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    currentAweme = param.thisObject
-                    param.result = false
+                override fun afterHookedMethod(p: MethodHookParam) {
+                    currentAweme = p.thisObject
+                    p.result = false
                 }
             })
     }
 
     fun isImageAweme(): Boolean {
-        return try {
-            (XposedHelpers.getObjectField(currentAweme, "awemeType") as? Int) == 68
-        } catch (_: Exception) { false }
+        return try { (XposedHelpers.getObjectField(currentAweme, "awemeType") as? Int) == 68 }
+        catch (_: Exception) { false }
     }
-
     fun getVideoUrl(): String? {
-        return try {
-            XposedHelpers.callMethod(currentAweme, "getFirstPlayAddr") as? String
-        } catch (_: Exception) { null }
+        return try { XposedHelpers.callMethod(currentAweme, "getFirstPlayAddr") as? String }
+        catch (_: Exception) { null }
     }
-
     fun getMusicUrl(): String? {
         return try {
-            val music = XposedHelpers.getObjectField(currentAweme, "music")
-            val playUrl = XposedHelpers.getObjectField(music, "playUrl")
-            val urlList = XposedHelpers.callMethod(playUrl, "getUrlList") as? List<*>
-            urlList?.firstOrNull()?.toString()
+            val m = XposedHelpers.getObjectField(currentAweme, "music")
+            val pu = XposedHelpers.getObjectField(m, "playUrl")
+            val ul = XposedHelpers.callMethod(pu, "getUrlList") as? List<*>
+            ul?.firstOrNull()?.toString()
         } catch (_: Exception) { null }
     }
-
     fun getDesc(): String {
-        return try {
-            XposedHelpers.getObjectField(currentAweme, "desc") as? String ?: ""
-        } catch (_: Exception) { "" }
+        return try { XposedHelpers.getObjectField(currentAweme, "desc") as? String ?: "" }
+        catch (_: Exception) { "" }
     }
 
-    private fun hookOne(
-        loader: ClassLoader, tag: String, className: String,
-        returnType: Class<*>?, methodName: String,
-        vararg paramTypes: Class<*>,
-        callback: XC_MethodHook
-    ): Boolean {
-        val clazz = XposedHelpers.findClassIfExists(className, loader)
-        if (clazz == null) { HookUtils.log("[" + tag + "] Class not found"); return false }
-        for (m in clazz.declaredMethods) {
-            if (m.name != methodName) continue
-            if (returnType != null && m.returnType != returnType) continue
-            val params = m.parameterTypes
-            if (params.size != paramTypes.size) continue
-            var match = true
+    private fun h(loader: ClassLoader, tag: String, cls: String,
+                  rt: Class<*>?, mn: String, pts: Array<Class<*>>,
+                  cb: XC_MethodHook): Boolean {
+        val c = XposedHelpers.findClassIfExists(cls, loader) ?: run {
+            HookUtils.log("[" + tag + "] Class not found"); return false
+        }
+        for (m in c.declaredMethods) {
+            if (m.name != mn) continue
+            if (rt != null && m.returnType != rt) continue
+            val mp = m.parameterTypes
+            if (mp.size != pts.size) continue
+            var ok = true
             var i = 0
-            while (i < paramTypes.size) {
-                if (paramTypes[i] != null && paramTypes[i] != params[i]) { match = false; break }
-                i++
-            }
-            if (!match) continue
+            while (i < pts.size) { if (pts[i] != null && pts[i] != mp[i]) { ok = false; break }; i++ }
+            if (!ok) continue
             m.isAccessible = true
-            XposedBridge.hookMethod(m, callback)
-            HookUtils.log("[" + tag + "] Hooked: " + clazz.simpleName + "." + m.name)
+            XposedBridge.hookMethod(m, cb)
             return true
         }
         return false

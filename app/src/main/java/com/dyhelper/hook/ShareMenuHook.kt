@@ -14,6 +14,7 @@ import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import java.lang.Void
 
 class ShareMenuHook(
     private val onCopy: (Context) -> Unit,
@@ -24,82 +25,50 @@ class ShareMenuHook(
 ) : BaseHook {
 
     override fun name() = "Menu"
-
     override fun init(loader: ClassLoader): Boolean {
-        return hookOne(loader, "Menu",
-            "com.ss.android.ugc.aweme.sharer.panelmodel.view.WrapSizeLinearLayout",
+        return h(loader, "Menu", "com.ss.android.ugc.aweme.sharer.panelmodel.view.WrapSizeLinearLayout",
             Void.TYPE, "onMeasure",
-            Integer.TYPE, Integer.TYPE,
+            arrayOf(Int::class.javaPrimitiveType, Int::class.javaPrimitiveType),
             object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    val panel = param.thisObject as? LinearLayout ?: return
+                override fun afterHookedMethod(p: MethodHookParam) {
+                    val panel = p.thisObject as? LinearLayout ?: return
                     if (panel.childCount < 1) return
                     if (panel.findViewWithTag<View>(888888) != null) return
                     val sn = panel.getChildAt(0).javaClass.simpleName
                     if (sn.contains("MeasureOnce") || sn.contains("Linear")) return
-                    injectMenu(panel, panel.context)
+                    addMenu(panel, panel.context)
                 }
             })
     }
 
-    private fun injectMenu(container: ViewGroup, ctx: Context) {
+    private fun addMenu(container: ViewGroup, ctx: Context) {
         val img = isImage()
-        val items = ArrayList<MenuItem>()
-        items.add(MenuItem("Copy", Runnable { onCopy(ctx) }))
-        items.add(MenuItem(if (img) "Image" else "Video",
+        val items = ArrayList<MI>()
+        items.add(MI("Copy", Runnable { onCopy(ctx) }))
+        items.add(MI(if (img) "Image" else "Video",
             Runnable { if (img) onImage(ctx) else onVideo(ctx) }))
-        items.add(MenuItem("Audio", Runnable { onAudio(ctx) }))
+        items.add(MI("Audio", Runnable { onAudio(ctx) }))
 
         val rv = RecyclerView(ctx)
         rv.layoutManager = LinearLayoutManager(ctx, LinearLayoutManager.HORIZONTAL, false)
         rv.setPadding(13, 0, 13, 0)
-        rv.adapter = MenuAdapter(items)
+        rv.adapter = MA(items)
         rv.tag = 888888
         container.addView(rv)
 
         val pb = ProgressBar(ctx, null, android.R.attr.progressBarStyleHorizontal)
-        pb.max = 100
-        pb.visibility = View.GONE
+        pb.max = 100; pb.visibility = View.GONE
         container.addView(pb)
     }
 
-    private fun hookOne(
-        loader: ClassLoader, tag: String, className: String,
-        returnType: Class<*>?, methodName: String,
-        vararg paramTypes: Class<*>,
-        callback: XC_MethodHook
-    ): Boolean {
-        val clazz = XposedHelpers.findClassIfExists(className, loader)
-        if (clazz == null) { HookUtils.log("[" + tag + "] Class not found"); return false }
-        for (m in clazz.declaredMethods) {
-            if (m.name != methodName) continue
-            if (returnType != null && m.returnType != returnType) continue
-            val params = m.parameterTypes
-            if (params.size != paramTypes.size) continue
-            var match = true
-            var i = 0
-            while (i < paramTypes.size) {
-                if (paramTypes[i] != null && paramTypes[i] != params[i]) { match = false; break }
-                i++
-            }
-            if (!match) continue
-            m.isAccessible = true
-            XposedBridge.hookMethod(m, callback)
-            return true
-        }
-        return false
-    }
+    data class MI(val label: String, val action: Runnable)
 
-    data class MenuItem(val label: String, val action: Runnable)
-    class MenuAdapter(private val items: List<MenuItem>) :
-        RecyclerView.Adapter<MenuAdapter.VH>() {
+    class MA(private val items: List<MI>) : RecyclerView.Adapter<MA.VH>() {
         class VH(view: TextView) : RecyclerView.ViewHolder(view)
-        override fun onCreateViewHolder(parent: ViewGroup, vt: Int): VH {
-            val tv = TextView(parent.context)
-            tv.textSize = 12f
-            tv.setTextColor(Color.parseColor("#CCCCCC"))
-            tv.gravity = Gravity.CENTER
-            tv.setPadding(20, 12, 20, 12)
+        override fun onCreateViewHolder(p: ViewGroup, vt: Int): VH {
+            val tv = TextView(p.context)
+            tv.textSize = 12f; tv.setTextColor(Color.parseColor("#CCCCCC"))
+            tv.gravity = Gravity.CENTER; tv.setPadding(20, 12, 20, 12)
             return VH(tv)
         }
         override fun onBindViewHolder(vh: VH, pos: Int) {
@@ -107,5 +76,27 @@ class ShareMenuHook(
             vh.itemView.setOnClickListener { items[pos].action.run() }
         }
         override fun getItemCount(): Int = items.size
+    }
+
+    private fun h(loader: ClassLoader, tag: String, cls: String,
+                  rt: Class<*>?, mn: String, pts: Array<Class<*>>,
+                  cb: XC_MethodHook): Boolean {
+        val c = XposedHelpers.findClassIfExists(cls, loader) ?: run {
+            HookUtils.log("[" + tag + "] Class not found"); return false
+        }
+        for (m in c.declaredMethods) {
+            if (m.name != mn) continue
+            if (rt != null && m.returnType != rt) continue
+            val mp = m.parameterTypes
+            if (mp.size != pts.size) continue
+            var ok = true
+            var i = 0
+            while (i < pts.size) { if (pts[i] != null && pts[i] != mp[i]) { ok = false; break }; i++ }
+            if (!ok) continue
+            m.isAccessible = true
+            XposedBridge.hookMethod(m, cb)
+            return true
+        }
+        return false
     }
 }

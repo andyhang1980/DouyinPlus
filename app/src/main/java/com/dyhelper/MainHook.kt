@@ -63,22 +63,17 @@ class MainHook : IXposedHookLoadPackage {
 
         var success = 0
         for (hook in hooks) {
-            try {
-                if (hook.init(loader)) success++
-            } catch (t: Throwable) {
-                HookUtils.log(hook.name() + " failed: " + t.message)
-            }
+            try { if (hook.init(loader)) success++ }
+            catch (t: Throwable) { HookUtils.log(hook.name() + " failed: " + t.message) }
         }
 
         val total = hooks.size
         val msg = "DH: " + success + "/" + total + " hooks OK"
-
         Handler(Looper.getMainLooper()).postDelayed({
             val t = Toast.makeText(ctx, msg, Toast.LENGTH_LONG)
             t.setGravity(Gravity.CENTER_HORIZONTAL or Gravity.TOP, 0, 200)
             t.show()
         }, 2000)
-
         HookUtils.log("=== " + success + "/" + total + " hooks ===")
     }
 }
