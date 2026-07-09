@@ -35,7 +35,7 @@ class MainHook : IXposedHookLoadPackage {
         private var inited = false
 
         fun log(msg: String) {
-            XposedBridge.log("[DH] $msg")
+            XposedBridge.log("[DH] " + msg)
         }
 
         fun toast(msg: String) {
@@ -50,7 +50,7 @@ class MainHook : IXposedHookLoadPackage {
         if (pkg != "com.ss.android.ugc.aweme" && pkg != "com.ss.android.ugc.aweme.lite") return
 
         classLoader = lpparam.classLoader
-        log("=== DH v2.2 $pkg ===")
+        log("=== DH v2.2 " + pkg + " ===")
 
         XposedHelpers.findAndHookMethod(
             Application::class.java, "attach", Context::class.java,
@@ -65,14 +65,14 @@ class MainHook : IXposedHookLoadPackage {
             })
     }
 
-    private fun hookByMethodName(
+    private fun hookCls(
         tag: String, className: String, returnType: Class<*>?,
         methodName: String, vararg paramTypes: Class<*>,
         callback: XC_MethodHook
     ): Boolean {
         val clazz = XposedHelpers.findClassIfExists(className, classLoader)
         if (clazz == null) {
-            log("[$tag] Class NOT found: $className")
+            log("[" + tag + "] Class NOT found: " + className)
             return false
         }
         for (m in clazz.declaredMethods) {
@@ -81,24 +81,29 @@ class MainHook : IXposedHookLoadPackage {
             val params = m.parameterTypes
             if (params.size != paramTypes.size) continue
             var match = true
-            for (i in paramTypes.indices) {
-                if (paramTypes[i] != null && paramTypes[i] != params[i]) { match = false; break }
+            var idx = 0
+            while (idx < paramTypes.size) {
+                if (paramTypes[idx] != null && paramTypes[idx] != params[idx]) {
+                    match = false
+                    break
+                }
+                idx++
             }
             if (!match) continue
             m.isAccessible = true
             XposedBridge.hookMethod(m, callback)
-            log("[$tag] Hooked: " + clazz.simpleName + "." + m.name)
+            log("[" + tag + "] Hooked: " + clazz.simpleName + "." + m.name)
             return true
         }
-        log("[$tag] Method NOT found: $methodName in $className")
+        log("[" + tag + "] Method NOT found: " + methodName + " in " + className)
         return false
     }
 
     private fun initHooks() {
         var ok = 0
+        val D = '$'
 
-        if (hookByMethodName(
-            "Menu",
+        if (hookCls("Menu",
             "com.ss.android.ugc.aweme.sharer.panelmodel.view.WrapSizeLinearLayout",
             Void.TYPE, "onMeasure",
             Integer.TYPE, Integer.TYPE,
@@ -113,9 +118,8 @@ class MainHook : IXposedHookLoadPackage {
                 }
             })) ok++
 
-        if (hookByMethodName(
-            "Menu2",
-            "com.ss.android.ugc.aweme.sharer.panelmodel.PanelBuilder${'$'}buildPanel${'$'}1",
+        if (hookCls("Menu2",
+            "com.ss.android.ugc.aweme.sharer.panelmodel.PanelBuilder" + D + "buildPanel" + D + "1",
             android.view.View::class.java, "onCreateView",
             Context::class.java, ViewGroup::class.java,
             object : XC_MethodHook() {
@@ -126,7 +130,7 @@ class MainHook : IXposedHookLoadPackage {
                 }
             })) ok++
 
-        if (hookByMethodName("Ad",
+        if (hookCls("Ad",
             "com.bytedance.ies.ugc.aweme.commercialize.splash.show.SplashAdActivity",
             Void.TYPE, "onCreate", Bundle::class.java,
             object : XC_MethodHook() {
@@ -135,7 +139,7 @@ class MainHook : IXposedHookLoadPackage {
                 }
             })) ok++
 
-        if (hookByMethodName("Splash",
+        if (hookCls("Splash",
             "com.ss.android.ugc.aweme.splash.SplashActivity",
             Void.TYPE, "onCreate", Bundle::class.java,
             object : XC_MethodHook() {
@@ -145,7 +149,7 @@ class MainHook : IXposedHookLoadPackage {
                 }
             })) ok++
 
-        if (hookByMethodName("Aweme",
+        if (hookCls("Aweme",
             "com.ss.android.ugc.aweme.feed.model.Aweme",
             Boolean::class.javaPrimitiveType, "isAd",
             object : XC_MethodHook() {
