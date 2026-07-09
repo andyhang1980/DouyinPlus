@@ -4,7 +4,6 @@ import com.dyhelper.util.ClassFinder
 import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
 
 class DataCaptureHook : BaseHook {
     companion object {
@@ -72,15 +71,15 @@ class DataCaptureHook : BaseHook {
     fun isImage(): Boolean {
         val aweme = currentAweme ?: return false
         try {
-            val at = XposedHelpers.getObjectField(aweme, "awemeType") as? Int
+            val at = HookUtils.getField(aweme, "awemeType") as? Int
             if (at != null) return at == 68
         } catch (_: Exception) {}
         try {
-            val img = XposedHelpers.callMethod(aweme, "isImage") as? Boolean
+            val img = HookUtils.callMethod(aweme, "isImage") as? Boolean
             if (img != null) return img
         } catch (_: Exception) {}
         try {
-            val at2 = XposedHelpers.callMethod(aweme, "getAwemeType") as? Int
+            val at2 = HookUtils.callMethod(aweme, "getAwemeType") as? Int
             if (at2 != null) return at2 == 68
         } catch (_: Exception) {}
         return false
@@ -90,14 +89,14 @@ class DataCaptureHook : BaseHook {
         val aweme = currentAweme ?: return null
         for (methodName in listOf("getFirstPlayAddr", "getVideoPlayAddr", "getOriginPlayAddr", "getDownloadAddr")) {
             try {
-                val url = XposedHelpers.callMethod(aweme, methodName) as? String
+                val url = HookUtils.callMethod(aweme, methodName) as? String
                 if (!url.isNullOrEmpty()) return extractUrl(url)
             } catch (_: Exception) {}
         }
         try {
-            val video = XposedHelpers.getObjectField(aweme, "video")
-            val playAddr = XposedHelpers.getObjectField(video, "playAddr")
-            val urlList = XposedHelpers.callMethod(playAddr, "getUrlList") as? List<*>
+            val video = HookUtils.getField(aweme, "video")
+            val playAddr = HookUtils.getField(video, "playAddr")
+            val urlList = HookUtils.callMethod(playAddr, "getUrlList") as? List<*>
             val first = urlList?.firstOrNull()?.toString()
             if (first != null) return first
         } catch (_: Exception) {}
@@ -107,16 +106,16 @@ class DataCaptureHook : BaseHook {
     fun getMusicUrl(): String? {
         try {
             val aweme = currentAweme ?: return null
-            val m = XposedHelpers.getObjectField(aweme, "music")
-            val pu = XposedHelpers.getObjectField(m, "playUrl")
-            val ul = XposedHelpers.callMethod(pu, "getUrlList") as? List<*>
+            val m = HookUtils.getField(aweme, "music")
+            val pu = HookUtils.getField(m, "playUrl")
+            val ul = HookUtils.callMethod(pu, "getUrlList") as? List<*>
             return ul?.firstOrNull()?.toString()
         } catch (_: Exception) { return null }
     }
 
     fun getDesc(): String {
         return try {
-            XposedHelpers.getObjectField(currentAweme, "desc") as? String ?: ""
+            HookUtils.getField(currentAweme!!, "desc") as? String ?: ""
         } catch (_: Exception) { "" }
     }
 

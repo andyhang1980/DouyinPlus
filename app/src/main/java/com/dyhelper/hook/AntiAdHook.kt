@@ -5,7 +5,6 @@ import com.dyhelper.util.ClassFinder
 import com.dyhelper.util.HookUtils
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.XposedHelpers
 
 class AntiAdHook : BaseHook {
     override fun name() = "Ad"
@@ -62,11 +61,11 @@ class AntiAdHook : BaseHook {
             }
         }
 
-        // Fallback: hook SplashActivity via XposedHelpers
+        // Fallback: hook SplashActivity via reflection (no XposedHelpers)
         if (!ok) {
             try {
-                val sc = XposedHelpers.findClass("com.ss.android.ugc.aweme.splash.SplashActivity", loader)
-                if (hookSplashClass(sc)) ok = true
+                val sc = HookUtils.findClass(loader, "com.ss.android.ugc.aweme.splash.SplashActivity")
+                if (sc != null && hookSplashClass(sc)) ok = true
             } catch (_: Exception) {}
         }
 
@@ -108,7 +107,7 @@ class AntiAdHook : BaseHook {
                 XposedBridge.hookMethod(m, object : XC_MethodHook() {
                     override fun afterHookedMethod(p: MethodHookParam) {
                         try {
-                            XposedHelpers.callMethod(p.thisObject, "goMainActivity")
+                            HookUtils.callMethod(p.thisObject, "goMainActivity")
                         } catch (_: Exception) {
                             (p.thisObject as? android.app.Activity)?.finish()
                         }

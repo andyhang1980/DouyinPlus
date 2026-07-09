@@ -22,7 +22,7 @@ class MainHook : IXposedHookLoadPackage {
     companion object {
         var classLoader: ClassLoader? = null
         private var inited = false
-        const val VERSION = "3.1.0-dy395"
+        const val VERSION = "3.1.1-dy395"
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
