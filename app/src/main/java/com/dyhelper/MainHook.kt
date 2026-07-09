@@ -62,13 +62,22 @@ class MainHook : IXposedHookLoadPackage {
         )
 
         var ok = 0
+        var names = ""
         for (h in hooks) {
-            try { if (h.init(loader)) ok++ }
-            catch (t: Throwable) { HookUtils.log(h.name() + " err: " + t.message) }
+            try {
+                if (h.init(loader)) {
+                    ok++
+                    if (names.isNotEmpty()) names += " "
+                    names += h.name()
+                }
+            } catch (t: Throwable) {
+                HookUtils.log(h.name() + " err: " + t.message)
+            }
         }
 
         val total = hooks.size
-        val msg = "DH: " + ok + "/" + total
+        val msg = if (ok == total) "自动适配完成 " + ok + "/" + total
+                  else "自动适配: " + ok + "/" + total + " " + names
 
         Handler(Looper.getMainLooper()).postDelayed({
             val t = Toast.makeText(ctx, msg, Toast.LENGTH_LONG)
@@ -76,6 +85,6 @@ class MainHook : IXposedHookLoadPackage {
             t.show()
         }, 2000)
 
-        HookUtils.log("=== " + ok + "/" + total + " ===")
+        HookUtils.log("=== " + ok + "/" + total + " : " + names + " ===")
     }
 }

@@ -19,7 +19,7 @@ class DownloadHook(private val c: DataCaptureHook) {
         if (text.isNotEmpty()) {
             val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("desc", text))
-            Toast.makeText(ctx, "Copied!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(ctx, "已复制!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -28,8 +28,8 @@ class DownloadHook(private val c: DataCaptureHook) {
     fun image(ctx: Context) { dl(ctx, null, ".jpg") }
 
     private fun dl(ctx: Context, url: String?, ext: String) {
-        if (url == null) { Toast.makeText(ctx, "No URL", Toast.LENGTH_SHORT).show(); return }
-        Toast.makeText(ctx, "Downloading...", Toast.LENGTH_SHORT).show()
+        if (url == null) { Toast.makeText(ctx, "获取链接失败", Toast.LENGTH_SHORT).show(); return }
+        Toast.makeText(ctx, "开始下载...", Toast.LENGTH_SHORT).show()
         Thread {
             try {
                 val conn = URL(url).openConnection() as HttpURLConnection
@@ -41,9 +41,9 @@ class DownloadHook(private val c: DataCaptureHook) {
                 val file = File(dir, name)
                 conn.inputStream.use { i -> FileOutputStream(file).use { o -> i.copyTo(o) } }
                 conn.disconnect()
-                Toast.makeText(ctx, "Done: " + file.name, Toast.LENGTH_SHORT).show()
+                Toast.makeText(ctx, "下载完成: " + file.name, Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(ctx, "Error: " + e.message, Toast.LENGTH_SHORT).show()
+                Toast.makeText(ctx, "错误: " + e.message, Toast.LENGTH_SHORT).show()
             }
         }.start()
     }
