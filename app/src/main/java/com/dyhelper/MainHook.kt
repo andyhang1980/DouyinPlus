@@ -1,4 +1,4 @@
-package com.dyhelper
+﻿package com.dyhelper
 
 import android.app.Application
 import android.content.Context
@@ -22,6 +22,7 @@ class MainHook : IXposedHookLoadPackage {
     companion object {
         var classLoader: ClassLoader? = null
         private var inited = false
+        const val VERSION = "3.1.0-dy395"
     }
 
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
@@ -29,7 +30,7 @@ class MainHook : IXposedHookLoadPackage {
         if (pkg != "com.ss.android.ugc.aweme" && pkg != "com.ss.android.ugc.aweme.lite") return
 
         classLoader = lpparam.classLoader
-        HookUtils.log("=== DH v3.0 " + pkg + " ===")
+        HookUtils.log("=== DH v$VERSION $pkg ===")
 
         XposedHelpers.findAndHookMethod(
             Application::class.java, "attach", Context::class.java,
@@ -57,8 +58,8 @@ class MainHook : IXposedHookLoadPackage {
                 imageFn = { c -> dl.image(c) },
                 checkImage = { cap.isImage() }
             ),
-            AntiAdHook(),
-            cap
+            cap,
+            AntiAdHook()
         )
 
         var ok = 0
@@ -76,8 +77,8 @@ class MainHook : IXposedHookLoadPackage {
         }
 
         val total = hooks.size
-        val msg = if (ok == total) "自动适配完成 " + ok + "/" + total
-                  else "自动适配: " + ok + "/" + total + " " + names
+        val msg = if (ok == total) "u81EAu52A8u9002u914Du5B8Cu6210 $ok/$total $names"
+                  else "u81EAu52A8u9002u914D: $ok/$total $names"
 
         Handler(Looper.getMainLooper()).postDelayed({
             val t = Toast.makeText(ctx, msg, Toast.LENGTH_LONG)
@@ -85,6 +86,6 @@ class MainHook : IXposedHookLoadPackage {
             t.show()
         }, 2000)
 
-        HookUtils.log("=== " + ok + "/" + total + " : " + names + " ===")
+        HookUtils.log("=== $ok/$total : $names ===")
     }
 }
